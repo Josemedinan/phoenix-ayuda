@@ -26,9 +26,15 @@ import {
   type SafetyState,
   type WaterState,
 } from "@/domain/continuity";
+import facilitiesDoc from "@/data/normalized/facilities.json";
+import {
+  buildFacilityVerificationQueue,
+  type FacilityState,
+} from "@/domain/facility-priority";
 
 const STORAGE_KEY = "phoenix-72h-profile-v1";
 const SIGNALS_KEY = "phoenix-72h-field-signals-v1";
+const FACILITY_STATES_KEY = "phoenix-72h-facility-states-v1";
 const SERVICE_WORKER_VERSION = "phoenix-aid-v6";
 const initialProfile: ContinuityProfile = {
   area: "La Guaira",
@@ -110,6 +116,9 @@ export default function Dashboard() {
   const [signals, setSignals] = useState<FieldSignal[]>([]);
   const [fieldInput, setFieldInput] = useState("");
   const [fieldError, setFieldError] = useState("");
+  const [facilityStates, setFacilityStates] = useState<
+    Record<string, FacilityState>
+  >({});
   const online = useSyncExternalStore(
     subscribeOnline,
     () => navigator.onLine,
@@ -124,6 +133,9 @@ export default function Dashboard() {
         if (saved) setProfile({ ...initialProfile, ...JSON.parse(saved) });
         const savedSignals = localStorage.getItem(SIGNALS_KEY);
         if (savedSignals) setSignals(JSON.parse(savedSignals));
+        const savedFacilityStates = localStorage.getItem(FACILITY_STATES_KEY);
+        if (savedFacilityStates)
+          setFacilityStates(JSON.parse(savedFacilityStates));
       } catch {}
       setLoaded(true);
     }, 0);
@@ -135,6 +147,10 @@ export default function Dashboard() {
   useEffect(() => {
     if (loaded) localStorage.setItem(SIGNALS_KEY, JSON.stringify(signals));
   }, [loaded, signals]);
+  useEffect(() => {
+    if (loaded)
+      localStorage.setItem(FACILITY_STATES_KEY, JSON.stringify(facilityStates));
+  }, [loaded, facilityStates]);
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker
@@ -250,6 +266,14 @@ export default function Dashboard() {
             </a>
           </Card>
         </section>
+
+        <FacilityTwin
+          signals={signals}
+          states={facilityStates}
+          setState={(id, state) =>
+            setFacilityStates((current) => ({ ...current, [id]: state }))
+          }
+        />
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[.95fr_1.05fr]">
           <Card>
@@ -534,6 +558,161 @@ export default function Dashboard() {
         app has no OpenAI API, backend, account, or paid runtime dependency.
       </footer>
     </div>
+  );
+}
+
+function FacilityTwin({
+  signals,
+  states,
+  setState,
+}: {
+  signals: FieldSignal[];
+  states: Record<string, FacilityState>;
+  setState: (id: string, state: FacilityState) => void;
+}) {
+  const queue = buildFacilityVerificationQueue(
+    facilitiesDoc.features,
+    signals,
+    states,
+  );
+  const top = queue.slice(0, 5);
+  const exportQueue = () => {
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      methodology:
+        "Verification priority only. It does not infer damage, capacity, or operational availability.",
+      publicFacilitySource:
+        "OpenStreetMap-derived facility snapshot; operational status is unknown until a field verifier records it.",
+      communitySignals: signals.length,
+      priorities: queue,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "phoenix-facility-verification-queue.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <section className="mt-8 overflow-hidden rounded-3xl bg-[#071a2b] p-5 text-white md:p-7">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-3xl">
+          <Badge tone="amber">HEALTH SYSTEM DIGITAL TWIN</Badge>
+          <h2 className="mt-3 text-3xl font-black md:text-4xl">
+            Do not guess which health centre is working. Verify the right one
+            first.
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-slate-300">
+            PHOENIX transforms the mapped health network into a transparent
+            field-verification queue. It combines facility type, isolation in
+            the network, proximity to the La Guaira response-focus area,
+            unknown-status penalty, and locally imported need signals. This is a
+            priority for an assessment visit—not a prediction of damage or
+            capacity.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={exportQueue}
+          className="rounded-xl bg-[#f8c85c] px-4 py-3 text-xs font-black text-slate-950"
+        >
+          EXPORT VERIFICATION QUEUE
+        </button>
+      </div>
+      <div className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
+        <div className="space-y-3">
+          {top.map((facility, index) => (
+            <article
+              key={facility.id}
+              className="rounded-2xl border border-slate-700 bg-white/5 p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black tracking-widest text-[#f8c85c]">
+                    #{index + 1} · VERIFY FIRST · SCORE {facility.score}
+                  </p>
+                  <h3 className="mt-1 text-lg font-black">{facility.name}</h3>
+                  <p className="text-xs text-slate-300">
+                    {facility.kind.toUpperCase()} · public map record, status
+                    previously unknown
+                  </p>
+                </div>
+                <Badge
+                  tone={
+                    facility.state === "functional"
+                      ? "green"
+                      : facility.state === "unsafe"
+                        ? "red"
+                        : facility.state === "constrained"
+                          ? "amber"
+                          : "dark"
+                  }
+                >
+                  {facility.state.toUpperCase()}
+                </Badge>
+              </div>
+              <ul className="mt-3 space-y-1 text-xs leading-5 text-slate-300">
+                {facility.reasons.slice(0, 3).map((reason) => (
+                  <li key={reason}>• {reason}</li>
+                ))}
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(
+                  ["functional", "constrained", "unsafe"] as FacilityState[]
+                ).map((state) => (
+                  <button
+                    key={state}
+                    type="button"
+                    onClick={() => setState(facility.id, state)}
+                    className={`rounded-lg border px-2.5 py-2 text-[10px] font-black ${facility.state === state ? "border-[#f8c85c] bg-[#f8c85c] text-slate-950" : "border-slate-600 text-white"}`}
+                  >
+                    MARK {state.toUpperCase()}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setState(facility.id, "unassessed")}
+                  className="px-2 text-[10px] font-black text-slate-300 underline"
+                >
+                  RESET
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+        <Card className="bg-[#eaf7ff] text-slate-950">
+          <p className="text-xs font-black tracking-widest text-slate-500">
+            ASSESSMENT PROTOCOL
+          </p>
+          <h3 className="mt-2 text-2xl font-black">
+            Four answers turn a map point into useful health intelligence.
+          </h3>
+          <ol className="mt-5 space-y-3">
+            {[
+              "Can people safely enter and leave?",
+              "Are water, power, oxygen, and fuel available?",
+              "Can staff provide essential medicines and care?",
+              "Where can a patient be referred if this site is constrained?",
+            ].map((item, index) => (
+              <li className="flex gap-3 text-sm leading-6" key={item}>
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-slate-950 text-xs font-black text-white">
+                  {index + 1}
+                </span>
+                {item}
+              </li>
+            ))}
+          </ol>
+          <p className="mt-5 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-950">
+            <b>Data integrity:</b> Field selections are stored only in this
+            browser until exported. They are observations requiring
+            organizational verification, not official facility status.
+          </p>
+        </Card>
+      </div>
+    </section>
   );
 }
 

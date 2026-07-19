@@ -21,15 +21,17 @@ The app runs after its first load without connectivity. A trusted person can car
 
 PHOENIX also has **Community Signal Mode**. A shelter lead, volunteer, or clinic worker can paste multiple PHX72 cards arriving by WhatsApp, QR, or nearby transfer. The app validates their checksum, removes duplicates, aggregates people and urgent categories, and exports an unverified JSON/text brief. This makes scattered low-bandwidth signals usable by the people who can actually assess and act, without creating a central database of affected people.
 
+Finally, PHOENIX turns the mapped health-centre dataset into a **Health System Digital Twin for verification**, not a speculative “live map.” PAHO reports that facility functionality, referral pathways, water, electricity, oxygen, fuel, medicines, and staffing are critical unknowns after the earthquake. PHOENIX ranks where a scarce assessment visit will produce the most useful information, using explicit factors: hospital vs. clinic criticality, network isolation, response-focus proximity, unknown status, and locally imported community signals. A field user records functional / constrained / unsafe locally, then exports the queue for review.
+
 ### Why it is different
 
 Humanitarian technology often asks people to report into a system. PHOENIX makes the **human handoff** itself safer and more legible when there may be no system to report into, then lets communities transform many handoffs into a privacy-preserving field brief.
 
-Its innovation is a small, auditable protocol for “continuity triage”: it compresses the information most likely to become dangerous over the next 72 hours into a privacy-bounded, device-to-device artifact. The same deterministic rules that choose the priority lane also define the payload, so the app cannot invent a facility, a diagnosis, availability, or a rescue promise.
+Its innovation is a small, auditable protocol for “continuity triage” plus an **uncertainty-first health-system digital twin**: it compresses the information most likely to become dangerous over the next 72 hours into a privacy-bounded, device-to-device artifact, then turns public facility geometry and local signal pressure into an assessment queue. The same deterministic rules that choose the priority lane also define the payload, so the app cannot invent a facility, a diagnosis, availability, or a rescue promise.
 
 ### How we built it
 
-We used Next.js, React, TypeScript, a deterministic TypeScript rules engine, a service worker, local browser storage, QR encoding, and Playwright/Vitest tests. The service worker is versioned and uses a network-first strategy for application bundles, so a stale offline cache cannot leave the visible app with broken click handlers.
+We used Next.js, React, TypeScript, deterministic TypeScript rules engines, an OpenStreetMap-derived health-facility snapshot, a service worker, local browser storage, QR encoding, and Playwright/Vitest tests. The service worker is versioned and uses a network-first strategy for application bundles, so a stale offline cache cannot leave the visible app with broken click handlers.
 
 Codex and GPT-5.6 were core collaborators during Build Week: they challenged the original dashboard concept, researched the humanitarian context, helped design and implement the new workflow, and helped run the safety and browser/offline validation loop.
 

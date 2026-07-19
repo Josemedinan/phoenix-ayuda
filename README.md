@@ -4,6 +4,8 @@
 
 PHOENIX 72H is a private, browser-based tool for a person or household whose phone may be their only remaining record after an earthquake. In about a minute it identifies structural danger, interrupted medication, maternal/infant care, and unsafe water; then produces a small, readable handoff card that can be copied into an SMS or carried as a QR code. A volunteer, clinic worker, or shelter lead can import multiple cards received through WhatsApp, QR, or device-to-device transfer and create an aggregate, exportable needs brief without collecting identities.
 
+Its health-system layer turns the 18 public, mapped health centres in the demo dataset into a **verification digital twin**. It does not pretend to know which sites are working. Instead, it ranks where scarce field assessment matters most from facility criticality, network isolation, proximity to the La Guaira response-focus area, missing status, and local community-signal pressure. A field worker can mark a site functional, constrained, or unsafe and export the assessment queue.
+
 It is intentionally not an aid-allocation system, facility directory, or emergency dispatcher. It never claims a clinic is open or that rescuers are coming. The community brief marks all reported needs **unverified**: an intact checksum proves that a card was not accidentally changed, not that a reported need has been independently confirmed.
 
 ## The problem it addresses
@@ -28,9 +30,10 @@ flowchart LR
 - **Green:** aftershock readiness and a protected continuity record.
 - **Offline handoff:** `PHX72` encodes only broad area, household count, safety, medication window, care flags, and water state. It contains no name, exact location, phone number, diagnosis, or account.
 - **Community signal mode:** imports intact cards locally, deduplicates them, counts red/medication/water/maternal needs, and exports a machine-readable JSON brief for a responder who chooses to use it.
+- **Facility verification twin:** ranks assessment visits instead of inventing operational status; stores local field observations and exports a transparent verification queue.
 - **Private persistence:** the card stays in the browser after a reload and can be erased with one button.
 
-The rules engine is deterministic and inspectable in [`domain/continuity/index.ts`](domain/continuity/index.ts). This is deliberate: in a high-stakes, low-connectivity moment, a user should not have to trust an opaque remote model to decide whether a person needs help.
+The rules engines are deterministic and inspectable in [`domain/continuity/index.ts`](domain/continuity/index.ts) and [`domain/facility-priority/index.ts`](domain/facility-priority/index.ts). This is deliberate: in a high-stakes, low-connectivity moment, a user should not have to trust an opaque remote model to decide whether a person needs help or whether a facility has capacity.
 
 ## Safety boundaries
 

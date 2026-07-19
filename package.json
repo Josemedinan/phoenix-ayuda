@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/unit/pocket.test.ts tests/unit/relay.test.ts tests/unit/continuity.test.ts",
+    "test": "vitest run tests/unit/pocket.test.ts tests/unit/relay.test.ts tests/unit/continuity.test.ts tests/unit/facility-priority.test.ts",
     "test:e2e": "playwright test",
     "format": "prettier --write ."
   },
