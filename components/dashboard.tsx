@@ -77,6 +77,21 @@ const subscribeOnline = (callback: () => void) => {
 };
 const getOnlineSnapshot = () => navigator.onLine;
 const getOnlineServerSnapshot = () => true;
+const SERVICE_WORKER_VERSION = "phoenix-aid-v4";
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
 function Pill({
   children,
   tone = "blue",
@@ -125,23 +140,21 @@ export default function Dashboard() {
     getOnlineServerSnapshot,
   );
   useEffect(() => {
-    if ("serviceWorker" in navigator)
-      navigator.serviceWorker
-        .register("/sw.js", { scope: "/", updateViaCache: "none" })
-        .then(() => navigator.serviceWorker.ready)
-        .then(
-          () =>
-            new Promise<void>((resolve) => {
-              if (navigator.serviceWorker.controller) return resolve();
-              navigator.serviceWorker.addEventListener(
-                "controllerchange",
-                () => resolve(),
-                { once: true },
-              );
-            }),
-        )
-        .then(() => setInstalled(true))
-        .catch(() => setInstalled(false));
+    if (!("serviceWorker" in navigator)) return;
+    const register = async () => {
+      try {
+        const registration = await navigator.serviceWorker.register(
+          `/sw.js?v=${SERVICE_WORKER_VERSION}`,
+          { scope: "/", updateViaCache: "none" },
+        );
+        await registration.update();
+        await navigator.serviceWorker.ready;
+        setInstalled(true);
+      } catch {
+        setInstalled(false);
+      }
+    };
+    void register();
   }, []);
   const createPlan = (next = profile) => {
     const generated = buildPocketPlan(next, new Date().toISOString());
@@ -195,7 +208,9 @@ export default function Dashboard() {
             <button
               data-testid={`nav-${id}`}
               key={id}
+              type="button"
               onClick={() => setView(id)}
+              aria-pressed={view === id}
               className={`flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-xs font-semibold ${view === id ? "border-slate-950 text-slate-950" : "border-transparent text-slate-500"}`}
             >
               <Icon size={15} />
@@ -388,6 +403,7 @@ function QuickButton({
   return (
     <button
       data-testid={testid}
+      type="button"
       onClick={onClick}
       className={`rounded-2xl border p-4 text-left transition ${c}`}
     >
@@ -741,16 +757,24 @@ function RequestCard({
       </Card>
     );
   const copy = async () => {
-    await navigator.clipboard.writeText(plan.privacySafeCode);
-    setCopied(true);
+    try {
+      await copyText(plan.privacySafeCode);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
   };
   const share = async () => {
-    if (navigator.share)
-      await navigator.share({
-        title: "PHOENIX request",
-        text: plan.privacySafeCode,
-      });
-    else await copy();
+    try {
+      if (navigator.share)
+        await navigator.share({
+          title: "PHOENIX request",
+          text: plan.privacySafeCode,
+        });
+      else await copy();
+    } catch {
+      await copy();
+    }
   };
   return (
     <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">

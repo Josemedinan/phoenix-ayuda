@@ -5,6 +5,21 @@ import { Check, Clipboard, Languages, LockKeyhole } from "lucide-react";
 import type { HouseholdProfile, PocketPlan } from "@/domain/pocket";
 import { buildLocalRelay, relayFactsSchema } from "@/domain/relay";
 
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
+
 export function RelayBuilder({
   profile,
   plan,
@@ -50,8 +65,12 @@ export function RelayBuilder({
   const copy = async (language: "es" | "en") => {
     const body =
       language === "es" ? relay.spanishMessage : relay.englishMessage;
-    await navigator.clipboard.writeText(`${body}\n${plan.privacySafeCode}`);
-    setCopied(language);
+    try {
+      await copyText(`${body}\n${plan.privacySafeCode}`);
+      setCopied(language);
+    } catch {
+      setCopied(null);
+    }
   };
 
   return (

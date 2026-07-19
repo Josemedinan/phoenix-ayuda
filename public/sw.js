@@ -1,4 +1,4 @@
-const CACHE = "phoenix-aid-v3";
+const CACHE = "phoenix-aid-v4";
 
 self.addEventListener("install", (event) =>
   event.waitUntil(
@@ -47,6 +47,19 @@ self.addEventListener("fetch", (event) => {
     return;
   event.respondWith(
     (async () => {
+      const url = new URL(event.request.url);
+      const networkFirst = async () => {
+        try {
+          const response = await fetch(event.request);
+          if (response.ok) {
+            const cache = await caches.open(CACHE);
+            await cache.put(event.request, response.clone());
+          }
+          return response;
+        } catch {
+          return (await caches.match(event.request)) || Response.error();
+        }
+      };
       if (event.request.mode === "navigate") {
         try {
           const response = await fetch(event.request);
@@ -59,6 +72,10 @@ self.addEventListener("fetch", (event) => {
           return (await caches.match("/")) || Response.error();
         }
       }
+      // Next's development chunks keep stable paths between edits. Prefer a
+      // fresh bundle so an old offline cache can never leave a visible UI with
+      // stale click handlers; retain the cached bundle as the offline fallback.
+      if (url.pathname.startsWith("/_next/")) return networkFirst();
       const cached = await caches.match(event.request);
       if (cached) return cached;
       try {
