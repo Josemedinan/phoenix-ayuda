@@ -20,6 +20,18 @@ export interface ContinuityPlan {
   sms: string;
 }
 
+export interface FieldSignal {
+  id: string;
+  area: string;
+  people: number;
+  safety: SafetyState;
+  medicationDays: number;
+  chronicCare: boolean;
+  pregnancyOrInfant: boolean;
+  water: WaterState;
+  tier: "RED" | "AMBER" | "GREEN";
+}
+
 const checksum = (value: string) =>
   [...value]
     .reduce(
@@ -90,5 +102,65 @@ export function buildContinuityPlan(
     waterLitres: profile.people * 15,
     handoffCode,
     sms: `PHOENIX 72H: ${need}. Area: ${profile.area}. People: ${profile.people}. Please read this offline card: ${handoffCode}`,
+  };
+}
+
+/** Validates a privacy-bounded card received by copy, QR, or a messaging app. */
+export function decodeFieldSignal(value: string): FieldSignal | null {
+  const match = value
+    .trim()
+    .match(/(PHX72\|[\s\S]*?\|X=[A-F0-9]{4})(?![A-Za-z0-9])/);
+  if (!match) return null;
+  const code = match[1];
+  const parts = Object.fromEntries(
+    code
+      .split("|")
+      .slice(1)
+      .map((part) => {
+        const index = part.indexOf("=");
+        return [part.slice(0, index), part.slice(index + 1)];
+      }),
+  );
+  const base = code.slice(0, code.lastIndexOf("|X="));
+  if (
+    parts.X !== checksum(base) ||
+    !parts.A ||
+    !["safe", "damaged", "trapped"].includes(parts.S) ||
+    !["enough", "uncertain", "none"].includes(parts.W)
+  )
+    return null;
+  const people = Number(parts.P);
+  const medicationDays = Number(parts.M);
+  if (
+    !Number.isInteger(people) ||
+    people < 1 ||
+    people > 20 ||
+    !Number.isInteger(medicationDays) ||
+    medicationDays < 0 ||
+    medicationDays > 3
+  )
+    return null;
+  const profile: ContinuityProfile = {
+    area: parts.A,
+    people,
+    safety: parts.S as SafetyState,
+    medicationDays,
+    chronicCare: parts.C === "1",
+    pregnancyOrInfant: parts.I === "1",
+    water: parts.W as WaterState,
+  };
+  return { id: code, ...profile, tier: buildContinuityPlan(profile).tier };
+}
+
+export function summarizeSignals(signals: FieldSignal[]) {
+  return {
+    totalSignals: signals.length,
+    totalPeople: signals.reduce((total, signal) => total + signal.people, 0),
+    red: signals.filter((signal) => signal.tier === "RED").length,
+    medication: signals.filter((signal) => signal.medicationDays <= 1).length,
+    water: signals.filter((signal) => signal.water !== "enough").length,
+    maternalOrInfant: signals.filter((signal) => signal.pregnancyOrInfant)
+      .length,
+    areas: [...new Set(signals.map((signal) => signal.area))],
   };
 }

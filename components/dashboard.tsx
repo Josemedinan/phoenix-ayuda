@@ -19,13 +19,17 @@ import {
 } from "lucide-react";
 import {
   buildContinuityPlan,
+  decodeFieldSignal,
+  summarizeSignals,
   type ContinuityProfile,
+  type FieldSignal,
   type SafetyState,
   type WaterState,
 } from "@/domain/continuity";
 
 const STORAGE_KEY = "phoenix-72h-profile-v1";
-const SERVICE_WORKER_VERSION = "phoenix-aid-v5";
+const SIGNALS_KEY = "phoenix-72h-field-signals-v1";
+const SERVICE_WORKER_VERSION = "phoenix-aid-v6";
 const initialProfile: ContinuityProfile = {
   area: "La Guaira",
   people: 1,
@@ -103,6 +107,9 @@ export default function Dashboard() {
   const [loaded, setLoaded] = useState(false);
   const [copied, setCopied] = useState<"sms" | "card" | null>(null);
   const [offlineReady, setOfflineReady] = useState(false);
+  const [signals, setSignals] = useState<FieldSignal[]>([]);
+  const [fieldInput, setFieldInput] = useState("");
+  const [fieldError, setFieldError] = useState("");
   const online = useSyncExternalStore(
     subscribeOnline,
     () => navigator.onLine,
@@ -115,6 +122,8 @@ export default function Dashboard() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) setProfile({ ...initialProfile, ...JSON.parse(saved) });
+        const savedSignals = localStorage.getItem(SIGNALS_KEY);
+        if (savedSignals) setSignals(JSON.parse(savedSignals));
       } catch {}
       setLoaded(true);
     }, 0);
@@ -123,6 +132,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
   }, [loaded, profile]);
+  useEffect(() => {
+    if (loaded) localStorage.setItem(SIGNALS_KEY, JSON.stringify(signals));
+  }, [loaded, signals]);
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker
@@ -150,6 +162,22 @@ export default function Dashboard() {
     localStorage.removeItem(STORAGE_KEY);
     setProfile(initialProfile);
     setCopied(null);
+  };
+  const importSignal = () => {
+    const signal = decodeFieldSignal(fieldInput);
+    if (!signal) {
+      setFieldError(
+        "This is not an intact PHX72 card. Ask the sender to copy the full code again.",
+      );
+      return;
+    }
+    setSignals((current) =>
+      current.some((item) => item.id === signal.id)
+        ? current
+        : [...current, signal],
+    );
+    setFieldInput("");
+    setFieldError("");
   };
   const update = <K extends keyof ContinuityProfile>(
     key: K,
@@ -466,6 +494,14 @@ export default function Dashboard() {
             </Card>
           </section>
         </div>
+        <FieldSignalBoard
+          input={fieldInput}
+          setInput={setFieldInput}
+          error={fieldError}
+          signals={signals}
+          onImport={importSignal}
+          onClear={() => setSignals([])}
+        />
         <section className="mt-8 grid gap-4 md:grid-cols-3">
           <Card>
             <LockKeyhole size={20} />
@@ -547,5 +583,148 @@ function Toggle({
       <Icon className="mt-0.5 shrink-0" size={18} />
       <span>{children}</span>
     </label>
+  );
+}
+
+function FieldSignalBoard({
+  input,
+  setInput,
+  error,
+  signals,
+  onImport,
+  onClear,
+}: {
+  input: string;
+  setInput: (value: string) => void;
+  error: string;
+  signals: FieldSignal[];
+  onImport: () => void;
+  onClear: () => void;
+}) {
+  const summary = summarizeSignals(signals);
+  const brief = `PHOENIX 72H COMMUNITY SIGNAL BRIEF\nUNVERIFIED, PRIVACY-BOUNDED REPORTS\nSignals: ${summary.totalSignals}\nPeople represented: ${summary.totalPeople}\nRed / structural danger: ${summary.red}\nMedication <=1 day: ${summary.medication}\nUnsafe or uncertain water: ${summary.water}\nPregnancy or infant continuity: ${summary.maternalOrInfant}\nBroad areas: ${summary.areas.join(", ") || "None"}\n\nEach source card was checksum-validated, but the reported need itself is not independently verified. Do not treat this brief as dispatch, allocation, or facility-status data.`;
+  const download = () => {
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            generatedAt: new Date().toISOString(),
+            disclaimer: "Checksum-valid cards; needs are unverified.",
+            signals,
+          },
+          null,
+          2,
+        ),
+      ],
+      { type: "application/json" },
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "phoenix-72h-community-signals.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <section className="mt-8 rounded-3xl border border-sky-300 bg-[#eaf7ff] p-5 md:p-7">
+      <div className="grid gap-5 lg:grid-cols-[1fr_.9fr]">
+        <div>
+          <Badge tone="dark">COMMUNITY SIGNAL MODE</Badge>
+          <h2 className="mt-3 text-3xl font-black">
+            Turn scattered messages into one safe, usable brief.
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-slate-700">
+            A volunteer, clinic worker, or shelter lead can paste PHX72 cards
+            received by QR, Bluetooth, or WhatsApp. PHOENIX validates the card
+            checksum locally, removes duplicates, and counts needs without
+            collecting identities or pretending reports are verified.
+          </p>
+          <label className="mt-5 block text-sm font-bold">
+            Paste a full PHX72 card
+            <textarea
+              data-testid="signal-input"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder="PHX72|A=La Guaira|..."
+              className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 bg-white p-3 font-mono text-xs"
+            />
+          </label>
+          {error && (
+            <p role="alert" className="mt-2 text-xs font-bold text-red-800">
+              {error}
+            </p>
+          )}
+          <button
+            data-testid="import-signal"
+            type="button"
+            onClick={onImport}
+            className="mt-3 rounded-xl bg-slate-950 px-4 py-3 text-xs font-black text-white"
+          >
+            IMPORT A COMMUNITY SIGNAL
+          </button>
+        </div>
+        <Card className="border-sky-200 bg-white/90">
+          <p className="text-xs font-black tracking-widest text-slate-500">
+            LOCAL NEEDS BRIEF
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <Metric label="CARDS" value={summary.totalSignals} />
+            <Metric label="PEOPLE" value={summary.totalPeople} />
+            <Metric label="RED" value={summary.red} />
+            <Metric label="MEDS ≤1D" value={summary.medication} />
+            <Metric label="WATER" value={summary.water} />
+            <Metric
+              label="MATERNAL / INFANT"
+              value={summary.maternalOrInfant}
+            />
+          </div>
+          <p className="mt-4 text-xs leading-5 text-slate-600">
+            Areas: {summary.areas.join(", ") || "No cards imported"}
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <button
+              data-testid="copy-brief"
+              type="button"
+              onClick={() => void copyText(brief)}
+              className="rounded-xl border border-slate-300 px-3 py-3 text-xs font-black"
+            >
+              COPY BRIEF
+            </button>
+            <button
+              type="button"
+              onClick={download}
+              className="rounded-xl bg-[#f8c85c] px-3 py-3 text-xs font-black"
+            >
+              DOWNLOAD JSON
+            </button>
+          </div>
+          {signals.length > 0 && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="mt-3 text-xs font-black underline"
+            >
+              CLEAR LOCAL BRIEF
+            </button>
+          )}
+          <p className="mt-4 rounded-xl bg-amber-50 p-3 text-[11px] leading-5 text-amber-950">
+            <b>Important:</b> checksum validation proves the code was not
+            accidentally altered. It does not verify a person&apos;s reported
+            need, create a referral, or establish aid availability.
+          </p>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl bg-slate-100 p-3">
+      <p className="text-2xl font-black">{value}</p>
+      <p className="mt-1 text-[9px] font-black tracking-wider text-slate-500">
+        {label}
+      </p>
+    </div>
   );
 }

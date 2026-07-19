@@ -21,6 +21,11 @@ test("creates a private, offline handoff card for a disrupted treatment", async 
     "PHX72|A=La Guaira|P=1|S=safe|M=0",
   );
 
+  const code = await page.getByTestId("handoff-code").innerText();
+  await page.getByTestId("signal-input").fill(code);
+  await page.getByTestId("import-signal").click();
+  await expect(page.getByText("Areas: La Guaira")).toBeVisible();
+
   await page.getByTestId("copy-sms").click();
   await expect(page.getByTestId("copy-sms")).toBeEnabled();
 

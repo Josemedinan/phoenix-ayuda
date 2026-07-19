@@ -1,10 +1,10 @@
 # PHOENIX 72H
 
-**An offline continuity card for the first 72 hours after an earthquake.**
+**A serverless community signal network for the first 72 hours after an earthquake.**
 
-PHOENIX 72H is a private, browser-based tool for a person or household whose phone may be their only remaining record after an earthquake. In about a minute it identifies structural danger, interrupted medication, maternal/infant care, and unsafe water; then produces a small, readable handoff card that can be copied into an SMS or carried as a QR code.
+PHOENIX 72H is a private, browser-based tool for a person or household whose phone may be their only remaining record after an earthquake. In about a minute it identifies structural danger, interrupted medication, maternal/infant care, and unsafe water; then produces a small, readable handoff card that can be copied into an SMS or carried as a QR code. A volunteer, clinic worker, or shelter lead can import multiple cards received through WhatsApp, QR, or device-to-device transfer and create an aggregate, exportable needs brief without collecting identities.
 
-It is intentionally not a dashboard, aid-allocation system, facility directory, or emergency dispatcher. It never claims a clinic is open or that rescuers are coming.
+It is intentionally not an aid-allocation system, facility directory, or emergency dispatcher. It never claims a clinic is open or that rescuers are coming. The community brief marks all reported needs **unverified**: an intact checksum proves that a card was not accidentally changed, not that a reported need has been independently confirmed.
 
 ## The problem it addresses
 
@@ -20,12 +20,14 @@ flowchart LR
   B --> C["Prioritized actions"]
   B --> D["Privacy-bounded PHX72 card"]
   D --> E["QR / copied SMS / trusted neighbor"]
+  E --> F["Local community needs brief"]
 ```
 
 - **Red:** someone is trapped or a building is unsafe.
 - **Amber:** treatment may run out, maternal/infant continuity is needed, or drinking water is uncertain.
 - **Green:** aftershock readiness and a protected continuity record.
 - **Offline handoff:** `PHX72` encodes only broad area, household count, safety, medication window, care flags, and water state. It contains no name, exact location, phone number, diagnosis, or account.
+- **Community signal mode:** imports intact cards locally, deduplicates them, counts red/medication/water/maternal needs, and exports a machine-readable JSON brief for a responder who chooses to use it.
 - **Private persistence:** the card stays in the browser after a reload and can be erased with one button.
 
 The rules engine is deterministic and inspectable in [`domain/continuity/index.ts`](domain/continuity/index.ts). This is deliberate: in a high-stakes, low-connectivity moment, a user should not have to trust an opaque remote model to decide whether a person needs help.

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildContinuityPlan } from "@/domain/continuity";
+import {
+  buildContinuityPlan,
+  decodeFieldSignal,
+  summarizeSignals,
+} from "@/domain/continuity";
 
 describe("PHOENIX 72H continuity card", () => {
   it("escalates structural danger above every other need", () => {
@@ -31,5 +35,26 @@ describe("PHOENIX 72H continuity card", () => {
     expect(plan.handoffCode).toContain("PHX72|A=Caracas|P=3");
     expect(plan.handoffCode).not.toContain("name");
     expect(plan.sms).toContain("health continuity");
+  });
+
+  it("imports only an intact privacy-bounded field signal", () => {
+    const plan = buildContinuityPlan({
+      area: "Miranda",
+      people: 2,
+      safety: "safe",
+      medicationDays: 1,
+      chronicCare: true,
+      pregnancyOrInfant: false,
+      water: "uncertain",
+    });
+    const signal = decodeFieldSignal(`Please help: ${plan.handoffCode}`);
+    expect(signal).toMatchObject({ area: "Miranda", tier: "AMBER" });
+    expect(decodeFieldSignal(`${plan.handoffCode}0`)).toBeNull();
+    expect(summarizeSignals([signal!])).toMatchObject({
+      totalSignals: 1,
+      totalPeople: 2,
+      medication: 1,
+      water: 1,
+    });
   });
 });

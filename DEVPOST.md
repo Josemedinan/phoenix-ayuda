@@ -19,9 +19,11 @@ It then creates a `PHX72` QR/SMS handoff card. The card carries only what a help
 
 The app runs after its first load without connectivity. A trusted person can carry the QR, read the code, or copy the SMS at a health point. The browser-local card can be erased in one tap.
 
+PHOENIX also has **Community Signal Mode**. A shelter lead, volunteer, or clinic worker can paste multiple PHX72 cards arriving by WhatsApp, QR, or nearby transfer. The app validates their checksum, removes duplicates, aggregates people and urgent categories, and exports an unverified JSON/text brief. This makes scattered low-bandwidth signals usable by the people who can actually assess and act, without creating a central database of affected people.
+
 ### Why it is different
 
-Humanitarian technology often asks people to report into a system. PHOENIX makes the **human handoff** itself safer and more legible when there may be no system to report into.
+Humanitarian technology often asks people to report into a system. PHOENIX makes the **human handoff** itself safer and more legible when there may be no system to report into, then lets communities transform many handoffs into a privacy-preserving field brief.
 
 Its innovation is a small, auditable protocol for “continuity triage”: it compresses the information most likely to become dangerous over the next 72 hours into a privacy-bounded, device-to-device artifact. The same deterministic rules that choose the priority lane also define the payload, so the app cannot invent a facility, a diagnosis, availability, or a rescue promise.
 

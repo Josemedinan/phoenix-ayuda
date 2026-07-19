@@ -1,4 +1,4 @@
-const CACHE = "phoenix-aid-v5";
+const CACHE = "phoenix-aid-v6";
 
 self.addEventListener("install", (event) =>
   event.waitUntil(
