@@ -1,0 +1,52 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": [
+    "node_modules",
+    "components/venezuela-map.tsx",
+    "domain/authorization/**",
+    "domain/humanitarian/**",
+    "domain/maritime/**",
+    "domain/mission/**",
+    "domain/response/**",
+    "domain/twin/**",
+    "domain/types.ts",
+    "schemas/**",
+    "services/**",
+    "stores/**",
+    "supabase/**",
+    "tests/unit/action-engine.test.ts",
+    "tests/unit/humanitarian.test.ts",
+    "tests/unit/rules.test.ts",
+    "tests/unit/twin.test.ts"
+  ]
+}

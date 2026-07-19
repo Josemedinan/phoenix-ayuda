@@ -1,0 +1,77 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+/test-results
+/playwright-report
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Generated Python artifacts
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Local/raw or potentially sensitive research snapshots are not published.
+/data/raw/
+/data/snapshots/
+/data/curated/
+/data/pipeline-runs.json
+
+# Legacy prototypes are retained locally but are outside the PHOENIX Aid release.
+/components/venezuela-map.tsx
+/domain/authorization/
+/domain/humanitarian/
+/domain/maritime/
+/domain/mission/
+/domain/response/
+/domain/twin/
+/domain/types.ts
+/schemas/
+/services/
+/stores/
+/supabase/
+/tests/unit/action-engine.test.ts
+/tests/unit/humanitarian.test.ts
+/tests/unit/rules.test.ts
+/tests/unit/twin.test.ts

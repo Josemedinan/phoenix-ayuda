@@ -1,0 +1,389 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "osm-node-2362558745",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9064488,
+          10.5223229
+        ]
+      },
+      "properties": {
+        "name": "Clínica Casablanca",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-2747265957",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0387244,
+          10.6001961
+        ]
+      },
+      "properties": {
+        "name": "Hospital Dr. Alfredo Machado",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-2780719879",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9491381,
+          10.5961803
+        ]
+      },
+      "properties": {
+        "name": "Alfa",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3121547137",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0137374,
+          10.5968026
+        ]
+      },
+      "properties": {
+        "name": "Módulo de Guaracarumbo",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3132435686",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.058316,
+          10.5886849
+        ]
+      },
+      "properties": {
+        "name": "Ambulatorio Jacinto Plaza",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3133046390",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0141809,
+          10.5965446
+        ]
+      },
+      "properties": {
+        "name": "Unidad Quirúrgica San Antonio",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3554616189",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0304818,
+          10.6019159
+        ]
+      },
+      "properties": {
+        "name": "Sersusalud",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3554616190",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0305525,
+          10.601898
+        ]
+      },
+      "properties": {
+        "name": "Clínica Salud y Familia",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3751800028",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9022186,
+          10.6029605
+        ]
+      },
+      "properties": {
+        "name": "Clínica Glamar",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3925805374",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9008151,
+          10.6034023
+        ]
+      },
+      "properties": {
+        "name": "Centro Médico Siempre 2000",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3925805465",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.90237,
+          10.6035245
+        ]
+      },
+      "properties": {
+        "name": "Centro Obstrético Ginecológico Dr. Luís F Marcano",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-3925814097",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.8506211,
+          10.6163166
+        ]
+      },
+      "properties": {
+        "name": "Clínica Camuribe",
+        "amenity": "clinic",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-4083284931",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -67.0714278,
+          10.5842019
+        ]
+      },
+      "properties": {
+        "name": "Ambulatorio Pedro Cova",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-8873560304",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9465449,
+          10.529567
+        ]
+      },
+      "properties": {
+        "name": "Ambulatorio Pedro González Rincones",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-10951503492",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9716662,
+          10.5981081
+        ]
+      },
+      "properties": {
+        "name": "Centro de Diagnóstico Integral",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-10951503503",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9838585,
+          10.5990693
+        ]
+      },
+      "properties": {
+        "name": "Centro Oftalmológico de Vargas",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-10969826433",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9008943,
+          10.6049139
+        ]
+      },
+      "properties": {
+        "name": "Ambulatorio Guaicamacuto",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "osm-node-12222548751",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -66.9115828,
+          10.5210329
+        ]
+      },
+      "properties": {
+        "name": "Ambulatorio Domingo Luciani",
+        "amenity": "hospital",
+        "operator": null,
+        "operationalStatus": "unknown",
+        "capacity": "unknown",
+        "verificationStatus": "single_source",
+        "sourceId": "osm-overpass",
+        "confidence": 0.72
+      }
+    }
+  ],
+  "provenance": {
+    "sourceId": "osm-overpass",
+    "license": "ODbL",
+    "ingestedAt": "2026-07-19T01:06:24+00:00",
+    "transformation": "Overpass elements converted to GeoJSON; no operational status inferred"
+  }
+}
