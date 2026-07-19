@@ -1,73 +1,65 @@
-# Devpost submission kit — PHOENIX 72H
+# Devpost submission kit — PHOENIX Seismo
 
 - **Track:** Apps for Your Life
-- **Tagline:** An offline continuity card that helps earthquake survivors protect treatment, water, and a safe handoff in the first 72 hours.
+- **Tagline:** A Venezuela-focused earthquake monitor that turns real-time public seismic data into clear local action.
 
 ## Ready-to-paste story
 
 ### Inspiration
 
-When an earthquake disrupts clinics, water, power, and communications, the most dangerous need is often invisible: a person whose medication is about to run out, a newborn who needs continuity of care, or a family with unsafe water. Generic dashboards cannot solve the moment when a neighbor has a low-battery phone and needs to explain what matters to the next health worker.
+In a seismic emergency, people do not need another generic dashboard. They need to know: did an event occur near Venezuela, where was its epicenter, how deep was it, how recent is the information, and what should I do right now? Public seismic data exists, but it is not designed around a person holding a phone after shaking.
 
-We built PHOENIX 72H around that moment. It is not a coordination platform. It is an offline, private **continuity card** a person can physically hand to another person.
+PHOENIX Seismo is the focused layer between a public scientific feed and a Venezuelan resident. It keeps the uncertainty visible rather than creating false confidence.
 
 ### What it does
 
-PHOENIX asks five short questions: structural safety, broad area, household size, medication window, care-continuity flags, and drinking-water state. Its deterministic safety kernel produces an immediate priority tier and a short sequence of safe, source-aligned next actions.
+PHOENIX Seismo polls the USGS public GeoJSON feed every minute through a fixed, server-side Venezuela monitor window. It presents current events with magnitude, depth, epicenter coordinates, event time in Venezuela, review status, a simple event map, and the original USGS detail link.
 
-It then creates a `PHX72` QR/SMS handoff card. The card carries only what a helper needs to understand urgency: broad area, household size, structural state, medication time remaining, continuity flags, and water state. It never includes names, exact coordinates, phone numbers, diagnoses, accounts, or a claim that help has been dispatched.
-
-The app runs after its first load without connectivity. A trusted person can carry the QR, read the code, or copy the SMS at a health point. The browser-local card can be erased in one tap.
-
-PHOENIX also has **Community Signal Mode**. A shelter lead, volunteer, or clinic worker can paste multiple PHX72 cards arriving by WhatsApp, QR, or nearby transfer. The app validates their checksum, removes duplicates, aggregates people and urgent categories, and exports an unverified JSON/text brief. This makes scattered low-bandwidth signals usable by the people who can actually assess and act, without creating a central database of affected people.
-
-Finally, PHOENIX turns the mapped health-centre dataset into a **Health System Digital Twin for verification**, not a speculative “live map.” PAHO reports that facility functionality, referral pathways, water, electricity, oxygen, fuel, medicines, and staffing are critical unknowns after the earthquake. PHOENIX ranks where a scarce assessment visit will produce the most useful information, using explicit factors: hospital vs. clinic criticality, network isolation, response-focus proximity, unknown status, and locally imported community signals. A field user records functional / constrained / unsafe locally, then exports the queue for review.
+People can choose an alert threshold and enable native browser notifications while the web app is open or installed. They can optionally calculate their approximate distance to an epicenter; coordinates remain in the browser and are never transmitted. The app also gives immediate, short guidance for shaking, damaged buildings, aftershocks, and coastal risk.
 
 ### Why it is different
 
-Humanitarian technology often asks people to report into a system. PHOENIX makes the **human handoff** itself safer and more legible when there may be no system to report into, then lets communities transform many handoffs into a privacy-preserving field brief.
+The innovation is not claiming impossible earthquake prediction. It is **trustworthy attention management under uncertainty**: a local, understandable interface that couples a live scientific source with explicit alert boundaries and safe actions.
 
-Its innovation is a small, auditable protocol for “continuity triage” plus an **uncertainty-first health-system digital twin**: it compresses the information most likely to become dangerous over the next 72 hours into a privacy-bounded, device-to-device artifact, then turns public facility geometry and local signal pressure into an assessment queue. The same deterministic rules that choose the priority lane also define the payload, so the app cannot invent a facility, a diagnosis, availability, or a rescue promise.
+Unlike a map that treats every dot equally, PHOENIX explains the event’s magnitude, depth, distance, status, and source; lets the person select the signal level that merits interruption; and labels preliminary data as preliminary. It intentionally refuses to pretend an app can provide an official warning, dispatch rescue, or determine local damage.
 
 ### How we built it
 
-We used Next.js, React, TypeScript, deterministic TypeScript rules engines, an OpenStreetMap-derived health-facility snapshot, a service worker, local browser storage, QR encoding, and Playwright/Vitest tests. The service worker is versioned and uses a network-first strategy for application bundles, so a stale offline cache cannot leave the visible app with broken click handlers.
+We used Next.js route handlers, React, TypeScript, the USGS FDSN/GeoJSON interface, browser Notifications, browser Geolocation, a service worker, and Vitest/Playwright. The server endpoint fixes its own bounds and query parameters; the client never exposes a secret and the application requires no key.
 
-Codex and GPT-5.6 were core collaborators during Build Week: they challenged the original dashboard concept, researched the humanitarian context, helped design and implement the new workflow, and helped run the safety and browser/offline validation loop.
+Codex and GPT-5.6 were core development collaborators during Build Week. They helped challenge and replace the previous idea, research the official feed contract, design safety boundaries, implement the route handler and monitor, and validate it with type, unit, build, browser, and offline checks.
 
-The deployed experience uses **no OpenAI API, API key, server, account, or paid runtime**. That is a deliberate resilience decision, not a missing feature.
+### Safety and limitations
 
-### Challenges and lessons
-
-The challenge was resisting attractive but unsafe features: live facility maps without verified operational data, unbounded AI chat in a medical/emergency scenario, and central data collection from people in crisis. We learned that a useful emergency product should make fewer promises, preserve more agency, and fail gracefully.
+PHOENIX is not an official Venezuelan warning authority, earthquake prediction system, emergency dispatch service, or tsunami warning source. Browser alerts work only while the app is open or active; a true background warning network requires formal authority integration and durable push infrastructure. Every event preserves a link back to USGS, and users are told to follow official Venezuelan authorities.
 
 ### What is next
 
-We would validate the wording and workflow with Venezuelan health workers, disability advocates, caregivers, and people using low-end devices; add accessibility and locally translated packs; create signed, versioned guidance updates; and explore voluntary Bluetooth/Nearby Share transport without centralizing personal data.
+We would validate the experience with Civil Protection, FUNVISIS, and residents using low-end Android devices; add an authorized national seismic feed when available; build a formally operated Web Push service; add accessibility-first audible/vibration patterns; and field-test language, threshold defaults, and aftershock guidance.
 
-## Three-minute demo script (2:40)
+## Three-minute demo script (2:35)
 
-**0:00–0:20 — Problem.** “After an earthquake, injury is not the only emergency. People lose medication, safe water, records, power, and the words to explain what matters. PHOENIX 72H is an offline continuity card—not a dashboard.”
+**0:00–0:20 — The need.** “After shaking, people need trusted details quickly. PHOENIX Seismo is not a prediction app and does not imitate an official authority.”
 
-**0:20–0:55 — Check-in.** Select damaged building, choose La Guaira, choose one day of medication, and mark water uncertain. Show the priority instantly becoming **Act now** or **Do this today**. Explain that the logic is deterministic and visible.
+**0:20–0:50 — Live source.** Show the live badge, refresh action, USGS source statement, latest magnitude, time, depth, and event status. Open the original USGS event link.
 
-**0:55–1:25 — Actionable output.** Show the ordered actions: do not re-enter, preserve medication information, seek care today, protect water. Point out the 15 L/person/day is labelled as a planning reference, not a supply promise.
+**0:50–1:20 — Epicenter.** Show the Venezuela-focused event view and a recent event card. Explain that the app distinguishes epicenter, depth, local distance, and impact; distance alone is not risk.
 
-**1:25–1:55 — Handoff.** Show the QR, compact `PHX72` code, and copied SMS. Explain exactly what it includes and excludes. “A neighbor can carry this to a health point; it does not pretend that a referral was sent.”
+**1:20–1:45 — Personal alert.** Adjust the magnitude slider, request browser notification permission, and explain the monitor refreshes every minute while open/active.
 
-**1:55–2:15 — Privacy.** Reload the browser to show the card persists locally; press erase to show it disappears. Explain no account, GPS, name, diagnosis, or cloud database is involved.
+**1:45–2:05 — Privacy and safety.** Use local distance. Point out that coordinates never leave the browser. Show the clear “during shaking” and “after shaking” actions.
 
-**2:15–2:35 — Offline.** Switch the browser offline and reload after **READY** appears. Create or show the card again.
+**2:05–2:25 — Reliability.** Show the test suite and offline app shell. Explain that a stale cache cannot silently serve an old UI bundle.
 
-**2:35–2:40 — Codex.** “Codex and GPT-5.6 helped us replace a generic dashboard with this tested, offline-first product. The survivor-facing path needs no paid API.”
+**2:25–2:35 — Codex.** “Codex and GPT-5.6 helped us turn an unfocused concept into this live, tested, transparent seismic monitor. The person-facing product needs no OpenAI API.”
 
 ## Submission checklist
 
-- [ ] Category: **Apps for Your Life**
-- [ ] Add the English story above.
-- [ ] Add a public demo URL.
+- [ ] Track: **Apps for Your Life**
+- [ ] Add a public deployed URL.
 - [ ] Add `https://github.com/Josemedinan/phoenix-ayuda`.
-- [ ] Upload a public YouTube video under three minutes with spoken Codex/GPT-5.6 contribution.
-- [ ] Run `/feedback` and add the required Codex Session ID.
-- [ ] Test in a private window and offline after **READY** appears.
-- [ ] Submit before the deadline on the [official rules page](https://openai.devpost.com/rules).
+- [ ] Record a public YouTube demo shorter than three minutes.
+- [ ] Explain Codex and GPT-5.6 contribution in the video audio.
+- [ ] Add the required Codex `/feedback` Session ID.
+- [ ] Verify browser notification permission and a live USGS event before recording.
+- [ ] Submit before the official deadline.

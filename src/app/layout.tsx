@@ -1,22 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "PHOENIX Aid — offline household lifeline",
+  title: "PHOENIX Seismo — Venezuela earthquake monitor",
   description:
-    "A private household plan, post-earthquake guide, and QR/SMS requests that work with limited connectivity.",
-  applicationName: "PHOENIX Aid",
+    "A Venezuela-focused, real-time earthquake monitor with public USGS event data and local browser alerts.",
+  applicationName: "PHOENIX Seismo",
   manifest: "/manifest.webmanifest",
 };
 
@@ -26,10 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

@@ -2,14 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "PHOENIX Aid Venezuela",
-    short_name: "PHOENIX Aid",
+    name: "PHOENIX Seismo Venezuela",
+    short_name: "PHOENIX Seismo",
     description:
-      "A private household plan, offline guide, and low-bandwidth request for people affected by the Venezuela earthquakes.",
+      "Venezuela-focused earthquake monitoring with real-time public seismic data and local browser alerts.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f4f0e8",
-    theme_color: "#f5c95e",
+    background_color: "#f5f7fb",
+    theme_color: "#061827",
     lang: "en",
     icons: [
       {

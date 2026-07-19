@@ -1,4 +1,4 @@
-const CACHE = "phoenix-aid-v6";
+const CACHE = "phoenix-seismo-v7";
 
 self.addEventListener("install", (event) =>
   event.waitUntil(

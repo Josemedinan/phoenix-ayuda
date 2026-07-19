@@ -1,909 +1,483 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { QRCodeSVG } from "qrcode.react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  Check,
-  Clipboard,
-  Droplets,
-  HeartPulse,
-  LockKeyhole,
-  RotateCcw,
+  Bell,
+  BellRing,
+  CircleAlert,
+  Clock3,
+  Crosshair,
+  ExternalLink,
+  LocateFixed,
+  RefreshCw,
   ShieldAlert,
-  Signal,
-  Stethoscope,
-  Users,
-  Wifi,
+  TriangleAlert,
   WifiOff,
 } from "lucide-react";
-import {
-  buildContinuityPlan,
-  decodeFieldSignal,
-  summarizeSignals,
-  type ContinuityProfile,
-  type FieldSignal,
-  type SafetyState,
-  type WaterState,
-} from "@/domain/continuity";
-import facilitiesDoc from "@/data/normalized/facilities.json";
-import {
-  buildFacilityVerificationQueue,
-  type FacilityState,
-} from "@/domain/facility-priority";
+import { distanceKm, severity, type SeismicEvent } from "@/domain/seismic";
 
-const STORAGE_KEY = "phoenix-72h-profile-v1";
-const SIGNALS_KEY = "phoenix-72h-field-signals-v1";
-const FACILITY_STATES_KEY = "phoenix-72h-facility-states-v1";
-const SERVICE_WORKER_VERSION = "phoenix-aid-v6";
-const initialProfile: ContinuityProfile = {
-  area: "La Guaira",
-  people: 1,
-  safety: "safe",
-  medicationDays: 3,
-  chronicCare: false,
-  pregnancyOrInfant: false,
-  water: "uncertain",
+type Feed = {
+  source: string;
+  generated: number;
+  events: SeismicEvent[];
+  error?: string;
 };
+type NotificationState = "unsupported" | "default" | "granted" | "denied";
+const POLL_MS = 60_000;
+const SERVICE_WORKER_VERSION = "phoenix-seismo-v7";
 
-const subscribeOnline = (callback: () => void) => {
-  window.addEventListener("online", callback);
-  window.addEventListener("offline", callback);
-  return () => {
-    window.removeEventListener("online", callback);
-    window.removeEventListener("offline", callback);
-  };
-};
-
-async function copyText(value: string) {
-  if (navigator.clipboard?.writeText && window.isSecureContext) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  const field = document.createElement("textarea");
-  field.value = value;
-  field.style.position = "fixed";
-  field.style.opacity = "0";
-  document.body.append(field);
-  field.select();
-  document.execCommand("copy");
-  field.remove();
-}
-
-function Badge({
-  children,
-  tone = "dark",
-}: {
-  children: React.ReactNode;
-  tone?: "dark" | "red" | "amber" | "green";
-}) {
-  const styles = {
-    dark: "border-slate-700 bg-slate-900 text-white",
-    red: "border-red-300 bg-red-50 text-red-900",
-    amber: "border-amber-300 bg-amber-50 text-amber-950",
-    green: "border-emerald-300 bg-emerald-50 text-emerald-950",
-  }[tone];
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black tracking-[.12em] ${styles}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function Card({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={`rounded-3xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}
-    >
-      {children}
-    </section>
-  );
-}
+const formatTime = (time: number) =>
+  new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/Caracas",
+  }).format(time);
+const tone = (event: SeismicEvent) =>
+  ({
+    critical: "border-red-300 bg-red-50 text-red-950",
+    high: "border-orange-300 bg-orange-50 text-orange-950",
+    moderate: "border-amber-300 bg-amber-50 text-amber-950",
+    low: "border-sky-200 bg-sky-50 text-sky-950",
+  })[severity(event)];
+const label = (event: SeismicEvent) =>
+  ({
+    critical: "ACT NOW",
+    high: "HIGH ATTENTION",
+    moderate: "FELT-LEVEL WATCH",
+    low: "INFORMATION",
+  })[severity(event)];
 
 export default function Dashboard() {
-  const [profile, setProfile] = useState<ContinuityProfile>(initialProfile);
-  const [loaded, setLoaded] = useState(false);
-  const [copied, setCopied] = useState<"sms" | "card" | null>(null);
-  const [offlineReady, setOfflineReady] = useState(false);
-  const [signals, setSignals] = useState<FieldSignal[]>([]);
-  const [fieldInput, setFieldInput] = useState("");
-  const [fieldError, setFieldError] = useState("");
-  const [facilityStates, setFacilityStates] = useState<
-    Record<string, FacilityState>
-  >({});
-  const online = useSyncExternalStore(
-    subscribeOnline,
-    () => navigator.onLine,
-    () => true,
-  );
-  const plan = buildContinuityPlan(profile);
+  const [feed, setFeed] = useState<Feed | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [threshold, setThreshold] = useState(4.5);
+  const [location, setLocation] = useState<[number, number] | null>(null);
+  const [locationError, setLocationError] = useState("");
+  const [notification, setNotification] =
+    useState<NotificationState>("unsupported");
+  const seen = useRef(new Set<string>());
+  const firstLoad = useRef(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/earthquakes", { cache: "no-store" });
+      const next = (await response.json()) as Feed;
+      if (!response.ok) throw new Error(next.error || "Live feed unavailable");
+      const alertable = next.events.filter(
+        (event) => event.magnitude >= threshold,
+      );
+      if (!firstLoad.current && Notification.permission === "granted") {
+        for (const event of alertable) {
+          if (!seen.current.has(event.id))
+            new Notification(`M ${event.magnitude.toFixed(1)} earthquake`, {
+              body: `${event.place} · ${event.depthKm.toFixed(0)} km deep`,
+              tag: event.id,
+            });
+        }
+      }
+      seen.current = new Set(next.events.map((event) => event.id));
+      firstLoad.current = false;
+      setFeed(next);
+      setError("");
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Live feed unavailable",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [threshold]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) setProfile({ ...initialProfile, ...JSON.parse(saved) });
-        const savedSignals = localStorage.getItem(SIGNALS_KEY);
-        if (savedSignals) setSignals(JSON.parse(savedSignals));
-        const savedFacilityStates = localStorage.getItem(FACILITY_STATES_KEY);
-        if (savedFacilityStates)
-          setFacilityStates(JSON.parse(savedFacilityStates));
-      } catch {}
-      setLoaded(true);
+      setNotification(
+        typeof Notification === "undefined"
+          ? "unsupported"
+          : Notification.permission,
+      );
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => {
-    if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-  }, [loaded, profile]);
-  useEffect(() => {
-    if (loaded) localStorage.setItem(SIGNALS_KEY, JSON.stringify(signals));
-  }, [loaded, signals]);
-  useEffect(() => {
-    if (loaded)
-      localStorage.setItem(FACILITY_STATES_KEY, JSON.stringify(facilityStates));
-  }, [loaded, facilityStates]);
-  useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker
+    void navigator.serviceWorker
       .register(`/sw.js?v=${SERVICE_WORKER_VERSION}`, {
         scope: "/",
         updateViaCache: "none",
       })
-      .then(async (registration) => {
-        await registration.update();
-        await navigator.serviceWorker.ready;
-        setOfflineReady(true);
-      })
-      .catch(() => setOfflineReady(false));
+      .catch(() => undefined);
   }, []);
-
-  const copy = async (kind: "sms" | "card") => {
-    try {
-      await copyText(kind === "sms" ? plan.sms : plan.handoffCode);
-      setCopied(kind);
-    } catch {
-      setCopied(null);
-    }
+  useEffect(() => {
+    const initialRefresh = window.setTimeout(() => void refresh(), 0);
+    const timer = window.setInterval(() => void refresh(), POLL_MS);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      window.clearInterval(timer);
+    };
+  }, [refresh]);
+  const enableAlerts = async () => {
+    if (typeof Notification === "undefined") return;
+    const result = await Notification.requestPermission();
+    setNotification(result);
   };
-  const reset = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setProfile(initialProfile);
-    setCopied(null);
-  };
-  const importSignal = () => {
-    const signal = decodeFieldSignal(fieldInput);
-    if (!signal) {
-      setFieldError(
-        "This is not an intact PHX72 card. Ask the sender to copy the full code again.",
-      );
-      return;
-    }
-    setSignals((current) =>
-      current.some((item) => item.id === signal.id)
-        ? current
-        : [...current, signal],
+  const useLocation = () => {
+    setLocationError("");
+    if (!navigator.geolocation)
+      return setLocationError("This device does not provide location.");
+    navigator.geolocation.getCurrentPosition(
+      (position) =>
+        setLocation([position.coords.longitude, position.coords.latitude]),
+      () =>
+        setLocationError(
+          "Location was not shared. The monitor still works without it.",
+        ),
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
     );
-    setFieldInput("");
-    setFieldError("");
   };
-  const update = <K extends keyof ContinuityProfile>(
-    key: K,
-    value: ContinuityProfile[K],
-  ) => setProfile((current) => ({ ...current, [key]: value }));
-
+  const events = useMemo(() => feed?.events || [], [feed]);
+  const latest = events[0];
   return (
-    <div className="min-h-screen bg-[#f5f3ee] text-slate-950">
-      <header className="border-b border-slate-200 bg-[#08151f] text-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 md:px-6">
+    <div className="min-h-screen bg-[#f5f7fb] text-slate-950">
+      <header className="border-b border-slate-200 bg-[#061827] text-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
           <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-[#f8c85c] text-slate-950">
-              <Signal size={21} />
+            <div className="grid size-10 place-items-center rounded-xl bg-[#ef5350]">
+              <TriangleAlert size={22} />
             </div>
             <div>
-              <p className="font-black tracking-[.16em]">PHOENIX 72H</p>
-              <p className="text-[10px] text-slate-300">
-                PRIVATE EARTHQUAKE CONTINUITY CARD
+              <p className="font-black tracking-[.16em]">PHOENIX SEISMO</p>
+              <p className="text-[10px] tracking-wider text-sky-200">
+                VENEZUELA EARTHQUAKE MONITOR
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Badge tone={online ? "green" : "amber"}>
-              {online ? (
-                <Wifi className="mr-1" size={12} />
-              ) : (
-                <WifiOff className="mr-1" size={12} />
-              )}
-              {online ? "ONLINE" : "OFFLINE"}
-            </Badge>
-            {offlineReady && (
-              <Badge tone="green">
-                <Check className="mr-1" size={12} />
-                READY
-              </Badge>
-            )}
-          </div>
+          <span className="rounded-full border border-sky-400/40 bg-sky-400/10 px-3 py-1 text-[10px] font-black tracking-widest">
+            LIVE USGS FEED
+          </span>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
-        <section className="grid gap-6 lg:grid-cols-[1.1fr_.9fr] lg:items-end">
+      <main className="mx-auto max-w-6xl px-4 py-7 md:py-10">
+        <section className="grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
           <div>
-            <Badge tone="amber">FOR THE FIRST 72 HOURS</Badge>
-            <h1 className="mt-4 text-4xl font-black leading-[1.02] tracking-tight md:text-6xl">
-              A health card that still works when the network does not.
+            <p className="text-xs font-black tracking-[.18em] text-red-700">
+              VENEZUELA-FOCUSED · UPDATED EVERY MINUTE
+            </p>
+            <h1 className="mt-3 text-4xl font-black tracking-tight md:text-6xl">
+              Know the shaking. Know what to do next.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600">
-              After an earthquake, people can lose medicines, safe water,
-              records, power, and a way to explain what matters. PHOENIX turns a
-              private 60-second check-in into a plain-language card another
-              person can carry, scan, or read offline.
+              PHOENIX Seismo monitors public USGS earthquake data for Venezuela
+              and nearby waters. It surfaces epicenter, depth, magnitude, and
+              local browser alerts—without an account, API key, or tracking your
+              location.
             </p>
           </div>
-          <Card className="border-amber-300 bg-[#fff9e8]">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-xs font-black tracking-widest text-slate-500">
-              WHY THIS EXISTS
+              ALERT STATUS
             </p>
-            <p className="mt-3 text-sm leading-6 text-slate-700">
-              Post-quake health demand is not only trauma. Interrupted chronic
-              treatment, maternal and infant care, and unsafe water become
-              urgent when clinics and communications are disrupted.
-            </p>
-            <a
-              className="mt-4 inline-block text-xs font-black underline"
-              target="_blank"
-              rel="noreferrer"
-              href="https://www.paho.org/en/emergencies"
+            <div className="mt-3 flex items-center gap-3">
+              {notification === "granted" ? (
+                <BellRing className="text-emerald-600" />
+              ) : (
+                <Bell className="text-slate-500" />
+              )}
+              <p className="font-bold">
+                {notification === "granted"
+                  ? `Alerting for M ${threshold.toFixed(1)}+`
+                  : notification === "denied"
+                    ? "Notifications blocked in browser"
+                    : "Alerts are off"}
+              </p>
+            </div>
+            <label className="mt-5 block text-sm font-bold">
+              Minimum magnitude: M {threshold.toFixed(1)}
+              <input
+                aria-label="Alert magnitude"
+                type="range"
+                min="3"
+                max="6"
+                step="0.5"
+                value={threshold}
+                onChange={(event) => setThreshold(Number(event.target.value))}
+                className="mt-3 w-full accent-red-600"
+              />
+            </label>
+            <button
+              data-testid="enable-alerts"
+              type="button"
+              disabled={
+                notification === "unsupported" || notification === "denied"
+              }
+              onClick={() => void enableAlerts()}
+              className="mt-5 w-full rounded-xl bg-slate-950 px-4 py-3 text-xs font-black text-white disabled:bg-slate-300"
             >
-              READ THE HEALTH CONTEXT
-            </a>
-          </Card>
+              {notification === "granted"
+                ? "BROWSER ALERTS ENABLED"
+                : "ENABLE LOCAL ALERTS"}
+            </button>
+            <p className="mt-3 text-[11px] leading-5 text-slate-500">
+              Alerts work while this tab or installed app is open. This is not
+              an official early-warning system and cannot predict earthquakes.
+            </p>
+          </div>
         </section>
-
-        <FacilityTwin
-          signals={signals}
-          states={facilityStates}
-          setState={(id, state) =>
-            setFacilityStates((current) => ({ ...current, [id]: state }))
-          }
-        />
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-[.95fr_1.05fr]">
-          <Card>
-            <div className="flex items-center gap-3">
-              <div className="grid size-9 place-items-center rounded-xl bg-slate-100">
-                <ShieldAlert size={20} />
-              </div>
+        <section className="mt-8 grid gap-5 lg:grid-cols-[.72fr_1.28fr]">
+          <div className="rounded-3xl bg-[#071f33] p-6 text-white">
+            <p className="text-xs font-black tracking-widest text-sky-200">
+              LATEST DETECTED EVENT
+            </p>
+            {loading && !latest ? (
+              <p className="mt-5 text-lg">Connecting to seismic feed…</p>
+            ) : latest ? (
+              <>
+                <p className="mt-5 text-6xl font-black">
+                  M {latest.magnitude.toFixed(1)}
+                </p>
+                <p className="mt-3 text-lg font-bold leading-6">
+                  {latest.place}
+                </p>
+                <p className="mt-3 text-sm text-slate-300">
+                  {formatTime(latest.time)} · {latest.depthKm.toFixed(1)} km
+                  deep
+                </p>
+                <a
+                  href={latest.eventUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950"
+                >
+                  USGS EVENT DETAILS <ExternalLink size={14} />
+                </a>
+              </>
+            ) : (
+              <p className="mt-5 text-lg">
+                No M2.5+ events in the monitored area over the last 24 hours.
+              </p>
+            )}
+          </div>
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-black tracking-widest text-slate-500">
-                  PRIVATE CHECK-IN
+                  VENEZUELA SEISMIC WINDOW
                 </p>
-                <h2 className="text-xl font-black">What must not be missed?</h2>
+                <h2 className="mt-1 text-2xl font-black">
+                  Recent events and epicenters
+                </h2>
+              </div>
+              <button
+                data-testid="refresh-feed"
+                type="button"
+                onClick={() => void refresh()}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-black"
+              >
+                <RefreshCw
+                  className={loading ? "animate-spin" : ""}
+                  size={14}
+                />
+                REFRESH
+              </button>
+            </div>
+            {error ? (
+              <div
+                role="alert"
+                className="mt-5 rounded-2xl bg-red-50 p-4 text-sm text-red-900"
+              >
+                <WifiOff className="mr-2 inline" size={16} />
+                {error}. The last successful data remains visible when
+                available.
+              </div>
+            ) : (
+              <EventMap events={events} />
+            )}
+            <p className="mt-3 text-[11px] text-slate-500">
+              Map is a schematic geographic view; it is not a navigation or
+              hazard map.
+            </p>
+          </div>
+        </section>
+        <section className="mt-5 grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <LocateFixed className="text-slate-700" />
+              <div>
+                <p className="text-xs font-black tracking-widest text-slate-500">
+                  OPTIONAL DISTANCE
+                </p>
+                <h2 className="font-black">How far is an epicenter?</h2>
               </div>
             </div>
-            <div className="mt-6 space-y-5">
-              <fieldset>
-                <legend className="text-sm font-bold">
-                  1. Is anyone in immediate structural danger?
-                </legend>
-                <div className="mt-2 grid gap-2">
-                  {(
-                    [
-                      ["safe", "Everyone is outside or in a safe place"],
-                      ["damaged", "The building is damaged or unsafe"],
-                      ["trapped", "Someone is trapped or cannot leave"],
-                    ] as [SafetyState, string][]
-                  ).map(([value, label]) => (
-                    <Choice
-                      key={value}
-                      active={profile.safety === value}
-                      tone={value === "trapped" ? "red" : "dark"}
-                      onClick={() => update("safety", value)}
-                    >
-                      {label}
-                    </Choice>
-                  ))}
-                </div>
-              </fieldset>
-              <label className="block text-sm font-bold">
-                2. Broad area only
-                <select
-                  aria-label="Broad area"
-                  value={profile.area}
-                  onChange={(event) => update("area", event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-medium"
-                >
-                  <option>La Guaira</option>
-                  <option>Caracas</option>
-                  <option>Miranda</option>
-                  <option>Aragua</option>
-                  <option>Carabobo</option>
-                  <option>Other area</option>
-                </select>
-              </label>
-              <label className="block text-sm font-bold">
-                3. People relying on this card
-                <input
-                  aria-label="People"
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={profile.people}
-                  onChange={(event) =>
-                    update(
-                      "people",
-                      Math.min(20, Math.max(1, Number(event.target.value))),
-                    )
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-medium"
-                />
-              </label>
-              <label className="block text-sm font-bold">
-                4. Days of essential medication left
-                <select
-                  aria-label="Medication days"
-                  value={profile.medicationDays}
-                  onChange={(event) =>
-                    update("medicationDays", Number(event.target.value))
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-medium"
-                >
-                  <option value={0}>None</option>
-                  <option value={1}>One day or less</option>
-                  <option value={2}>Two days</option>
-                  <option value={3}>Three or more days</option>
-                </select>
-              </label>
-              <Toggle
-                checked={profile.chronicCare}
-                onChange={(checked) => update("chronicCare", checked)}
-                icon={Stethoscope}
-              >
-                A person needs ongoing treatment (for example, diabetes, blood
-                pressure, dialysis, or disability support)
-              </Toggle>
-              <Toggle
-                checked={profile.pregnancyOrInfant}
-                onChange={(checked) => update("pregnancyOrInfant", checked)}
-                icon={HeartPulse}
-              >
-                Pregnancy, a newborn, or an infant needs care continuity
-              </Toggle>
-              <fieldset>
-                <legend className="text-sm font-bold">5. Drinking water</legend>
-                <div className="mt-2 grid gap-2">
-                  {(
-                    [
-                      ["enough", "Protected water available"],
-                      ["uncertain", "Water source or storage is uncertain"],
-                      ["none", "No protected drinking water"],
-                    ] as [WaterState, string][]
-                  ).map(([value, label]) => (
-                    <Choice
-                      key={value}
-                      active={profile.water === value}
-                      tone={value === "none" ? "red" : "dark"}
-                      onClick={() => update("water", value)}
-                    >
-                      {label}
-                    </Choice>
-                  ))}
-                </div>
-              </fieldset>
-            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Your coordinates are used only in this browser to calculate
+              distance; they are never sent to PHOENIX or USGS.
+            </p>
             <button
               type="button"
-              onClick={reset}
-              className="mt-6 inline-flex items-center gap-2 text-xs font-black text-slate-500 underline"
+              onClick={useLocation}
+              className="mt-4 rounded-xl border border-slate-300 px-4 py-3 text-xs font-black"
             >
-              <RotateCcw size={14} />
-              ERASE THIS DEVICE&apos;S CARD
+              <Crosshair className="mr-2 inline" size={14} />
+              {location ? "LOCATION USED LOCALLY" : "CALCULATE DISTANCE"}
             </button>
-          </Card>
-
-          <section aria-live="polite">
-            <Card
-              className={
-                plan.tier === "RED"
-                  ? "border-red-400 bg-red-50"
-                  : plan.tier === "AMBER"
-                    ? "border-amber-400 bg-amber-50"
-                    : "border-emerald-400 bg-emerald-50"
-              }
-            >
-              <Badge
-                tone={
-                  plan.tier === "RED"
-                    ? "red"
-                    : plan.tier === "AMBER"
-                      ? "amber"
-                      : "green"
-                }
-              >
-                {plan.tier} PRIORITY
-              </Badge>
-              <h2
-                data-testid="priority-title"
-                className="mt-4 text-4xl font-black"
-              >
-                {plan.title}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
-                This is a decision aid, not a diagnosis or emergency dispatch.
-                In immediate danger, ask a nearby person to contact available
-                official emergency services.
+            {locationError && (
+              <p className="mt-3 text-xs font-bold text-red-800">
+                {locationError}
               </p>
-              <div className="mt-6 space-y-3">
-                {plan.actions.map((action, index) => (
-                  <div
-                    key={action}
-                    className="flex gap-3 rounded-2xl bg-white/80 p-4"
-                  >
-                    <span className="grid size-7 shrink-0 place-items-center rounded-full bg-slate-950 text-xs font-black text-white">
-                      {index + 1}
-                    </span>
-                    <p className="text-sm font-medium leading-6">{action}</p>
-                  </div>
-                ))}
-              </div>
-              {profile.water !== "enough" && (
-                <div className="mt-5 flex items-center gap-3 rounded-2xl border border-sky-300 bg-sky-50 p-4">
-                  <Droplets className="text-sky-800" />
-                  <p className="text-sm">
-                    <b>{plan.waterLitres} L/day</b> is the Sphere planning
-                    reference for {profile.people}{" "}
-                    {profile.people === 1 ? "person" : "people"}. It is a
-                    minimum reference, not a promise of supply.
-                  </p>
+            )}
+            <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-xs leading-5 text-amber-950">
+              <b>Distance is not impact.</b> Local soil, building condition,
+              depth, and official advisories determine risk.
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-black">
+                Earthquakes in the last 24 hours
+              </h2>
+              <span className="text-xs font-bold text-slate-500">
+                {events.length} EVENTS
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {events.map((event) => (
+                <EventRow key={event.id} event={event} location={location} />
+              ))}
+              {!loading && events.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">
+                  No M2.5+ earthquakes reported in the monitored Venezuela
+                  window during the last 24 hours.
                 </div>
               )}
-            </Card>
-            <Card className="mt-6 overflow-hidden bg-[#08151f] text-white">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-black tracking-widest text-slate-300">
-                    OFFLINE HANDOFF CARD
-                  </p>
-                  <h2 className="mt-1 text-2xl font-black">
-                    Carry the signal, not your identity.
-                  </h2>
-                </div>
-                <Users className="text-[#f8c85c]" size={28} />
-              </div>
-              <div className="mt-5 grid gap-5 sm:grid-cols-[auto_1fr]">
-                <div className="w-fit rounded-2xl bg-white p-3">
-                  <QRCodeSVG value={plan.handoffCode} size={155} level="M" />
-                </div>
-                <div>
-                  <p
-                    data-testid="handoff-code"
-                    className="break-all rounded-xl bg-black/30 p-3 font-mono text-[11px] leading-5 text-emerald-200"
-                  >
-                    {plan.handoffCode}
-                  </p>
-                  <p className="mt-3 text-xs leading-5 text-slate-300">
-                    Contains only broad area, household count, safety and
-                    continuity flags. No name, phone number, precise location,
-                    diagnosis, or cloud account.
-                  </p>
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    <button
-                      data-testid="copy-card"
-                      type="button"
-                      onClick={() => copy("card")}
-                      className="rounded-xl border border-slate-500 px-3 py-3 text-xs font-black"
-                    >
-                      <Clipboard className="mr-2 inline" size={14} />
-                      {copied === "card" ? "CARD COPIED" : "COPY CARD"}
-                    </button>
-                    <button
-                      data-testid="copy-sms"
-                      type="button"
-                      onClick={() => copy("sms")}
-                      className="rounded-xl bg-[#f8c85c] px-3 py-3 text-xs font-black text-slate-950"
-                    >
-                      <AlertTriangle className="mr-2 inline" size={14} />
-                      {copied === "sms" ? "SMS COPIED" : "COPY SMS"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </section>
-        </div>
-        <FieldSignalBoard
-          input={fieldInput}
-          setInput={setFieldInput}
-          error={fieldError}
-          signals={signals}
-          onImport={importSignal}
-          onClear={() => setSignals([])}
-        />
+            </div>
+          </div>
+        </section>
         <section className="mt-8 grid gap-4 md:grid-cols-3">
-          <Card>
-            <LockKeyhole size={20} />
-            <h2 className="mt-3 font-black">Private by default</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              The check-in is saved only in this browser, so the card remains
-              useful after a reload. Erase it with one tap.
-            </p>
-          </Card>
-          <Card>
-            <Signal size={20} />
-            <h2 className="mt-3 font-black">Designed for a handoff</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              A neighbor can show the QR or copied SMS at a health point without
-              needing an account or a data plan.
-            </p>
-          </Card>
-          <Card>
-            <Droplets size={20} />
-            <h2 className="mt-3 font-black">No fabricated availability</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              PHOENIX never claims a clinic is open, a rescuer is coming, or aid
-              has been allocated.
-            </p>
-          </Card>
+          <Guide
+            icon={ShieldAlert}
+            title="During shaking"
+            text="Drop, cover, and hold on. Stay away from windows. Do not run outside while the ground is moving."
+          />
+          <Guide
+            icon={AlertTriangle}
+            title="After shaking"
+            text="Move away from damaged structures and downed wires. Expect aftershocks; follow official Civil Protection instructions."
+          />
+          <Guide
+            icon={CircleAlert}
+            title="Coastal areas"
+            text="Follow official tsunami and coastal notices. Do not use this app as a tsunami warning source."
+          />
+        </section>
+        <section className="mt-8 border-t border-slate-200 pt-6 text-xs leading-6 text-slate-500">
+          <p>
+            <b>Data:</b> USGS Earthquake Hazards Program public GeoJSON feed,
+            refreshed every minute. PHOENIX filters a Venezuela-centered window
+            (0–14°N, 74–57°W) and displays preliminary events as reported by
+            USGS.
+          </p>
+          <p className="mt-2">
+            <b>Safety:</b> PHOENIX Seismo is an information monitor, not a
+            government warning authority, emergency dispatch service, or
+            earthquake prediction tool. Follow official Venezuelan authorities
+            in an emergency.
+          </p>
         </section>
       </main>
-      <footer className="mx-auto max-w-5xl px-4 pb-8 text-center text-[11px] leading-5 text-slate-500">
-        Built with Codex and GPT-5.6 during OpenAI Build Week. The production
-        app has no OpenAI API, backend, account, or paid runtime dependency.
-      </footer>
     </div>
   );
 }
 
-function FacilityTwin({
-  signals,
-  states,
-  setState,
+function EventRow({
+  event,
+  location,
 }: {
-  signals: FieldSignal[];
-  states: Record<string, FacilityState>;
-  setState: (id: string, state: FacilityState) => void;
+  event: SeismicEvent;
+  location: [number, number] | null;
 }) {
-  const queue = buildFacilityVerificationQueue(
-    facilitiesDoc.features,
-    signals,
-    states,
-  );
-  const top = queue.slice(0, 5);
-  const exportQueue = () => {
-    const payload = {
-      generatedAt: new Date().toISOString(),
-      methodology:
-        "Verification priority only. It does not infer damage, capacity, or operational availability.",
-      publicFacilitySource:
-        "OpenStreetMap-derived facility snapshot; operational status is unknown until a field verifier records it.",
-      communitySignals: signals.length,
-      priorities: queue,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "phoenix-facility-verification-queue.json";
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const distance = location
+    ? distanceKm(location, [event.longitude, event.latitude])
+    : null;
   return (
-    <section className="mt-8 overflow-hidden rounded-3xl bg-[#071a2b] p-5 text-white md:p-7">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-3xl">
-          <Badge tone="amber">HEALTH SYSTEM DIGITAL TWIN</Badge>
-          <h2 className="mt-3 text-3xl font-black md:text-4xl">
-            Do not guess which health centre is working. Verify the right one
-            first.
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-300">
-            PHOENIX transforms the mapped health network into a transparent
-            field-verification queue. It combines facility type, isolation in
-            the network, proximity to the La Guaira response-focus area,
-            unknown-status penalty, and locally imported need signals. This is a
-            priority for an assessment visit—not a prediction of damage or
-            capacity.
+    <article
+      data-testid="event-row"
+      className={`rounded-2xl border p-4 ${tone(event)}`}
+    >
+      <div className="flex gap-3">
+        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-white text-lg font-black">
+          M{event.magnitude.toFixed(1)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-black">{event.place}</p>
+            <span className="text-[10px] font-black tracking-wider">
+              {label(event)}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-5">
+            Epicenter: {event.latitude.toFixed(3)}°,{" "}
+            {event.longitude.toFixed(3)}° · depth {event.depthKm.toFixed(1)} km
+            {distance !== null
+              ? ` · about ${distance.toFixed(0)} km from you`
+              : ""}
+          </p>
+          <p className="mt-1 inline-flex items-center gap-1 text-[11px]">
+            <Clock3 size={12} />
+            {formatTime(event.time)} · {event.status}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={exportQueue}
-          className="rounded-xl bg-[#f8c85c] px-4 py-3 text-xs font-black text-slate-950"
+      </div>
+    </article>
+  );
+}
+
+function EventMap({ events }: { events: SeismicEvent[] }) {
+  return (
+    <div
+      data-testid="epicenter-map"
+      className="relative mt-5 h-64 overflow-hidden rounded-2xl border border-sky-200 bg-[radial-gradient(circle_at_35%_60%,#c8e5ed_0_1px,transparent_1px),linear-gradient(140deg,#dff3f8,#c3dce7)]"
+    >
+      <div className="absolute inset-y-0 left-[57%] w-[42%] rounded-l-[48%] bg-[#d6e3b8] opacity-90" />
+      <span className="absolute right-5 top-6 text-xs font-black text-emerald-950">
+        VENEZUELA
+      </span>
+      <span className="absolute left-4 bottom-4 text-[10px] font-black tracking-widest text-sky-900">
+        CARIBBEAN SEA
+      </span>
+      {events.slice(0, 20).map((event) => (
+        <span
+          key={event.id}
+          title={`${event.magnitude} ${event.place}`}
+          className={`absolute grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white text-[10px] font-black shadow ${severity(event) === "critical" ? "bg-red-600 text-white" : severity(event) === "high" ? "bg-orange-500 text-white" : "bg-amber-400 text-slate-950"}`}
+          style={{
+            left: `${Math.min(93, Math.max(6, ((event.longitude + 74) / 17) * 100))}%`,
+            top: `${Math.min(91, Math.max(8, ((14 - event.latitude) / 14) * 100))}%`,
+          }}
         >
-          EXPORT VERIFICATION QUEUE
-        </button>
-      </div>
-      <div className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_.85fr]">
-        <div className="space-y-3">
-          {top.map((facility, index) => (
-            <article
-              key={facility.id}
-              className="rounded-2xl border border-slate-700 bg-white/5 p-4"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black tracking-widest text-[#f8c85c]">
-                    #{index + 1} · VERIFY FIRST · SCORE {facility.score}
-                  </p>
-                  <h3 className="mt-1 text-lg font-black">{facility.name}</h3>
-                  <p className="text-xs text-slate-300">
-                    {facility.kind.toUpperCase()} · public map record, status
-                    previously unknown
-                  </p>
-                </div>
-                <Badge
-                  tone={
-                    facility.state === "functional"
-                      ? "green"
-                      : facility.state === "unsafe"
-                        ? "red"
-                        : facility.state === "constrained"
-                          ? "amber"
-                          : "dark"
-                  }
-                >
-                  {facility.state.toUpperCase()}
-                </Badge>
-              </div>
-              <ul className="mt-3 space-y-1 text-xs leading-5 text-slate-300">
-                {facility.reasons.slice(0, 3).map((reason) => (
-                  <li key={reason}>• {reason}</li>
-                ))}
-              </ul>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(
-                  ["functional", "constrained", "unsafe"] as FacilityState[]
-                ).map((state) => (
-                  <button
-                    key={state}
-                    type="button"
-                    onClick={() => setState(facility.id, state)}
-                    className={`rounded-lg border px-2.5 py-2 text-[10px] font-black ${facility.state === state ? "border-[#f8c85c] bg-[#f8c85c] text-slate-950" : "border-slate-600 text-white"}`}
-                  >
-                    MARK {state.toUpperCase()}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setState(facility.id, "unassessed")}
-                  className="px-2 text-[10px] font-black text-slate-300 underline"
-                >
-                  RESET
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-        <Card className="bg-[#eaf7ff] text-slate-950">
-          <p className="text-xs font-black tracking-widest text-slate-500">
-            ASSESSMENT PROTOCOL
-          </p>
-          <h3 className="mt-2 text-2xl font-black">
-            Four answers turn a map point into useful health intelligence.
-          </h3>
-          <ol className="mt-5 space-y-3">
-            {[
-              "Can people safely enter and leave?",
-              "Are water, power, oxygen, and fuel available?",
-              "Can staff provide essential medicines and care?",
-              "Where can a patient be referred if this site is constrained?",
-            ].map((item, index) => (
-              <li className="flex gap-3 text-sm leading-6" key={item}>
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-slate-950 text-xs font-black text-white">
-                  {index + 1}
-                </span>
-                {item}
-              </li>
-            ))}
-          </ol>
-          <p className="mt-5 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-950">
-            <b>Data integrity:</b> Field selections are stored only in this
-            browser until exported. They are observations requiring
-            organizational verification, not official facility status.
-          </p>
-        </Card>
-      </div>
-    </section>
-  );
-}
-
-function Choice({
-  active,
-  tone,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  tone: "dark" | "red";
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`w-full rounded-xl border p-3 text-left text-sm font-medium transition ${active ? (tone === "red" ? "border-red-600 bg-red-100 text-red-950" : "border-slate-950 bg-slate-950 text-white") : "border-slate-200 bg-white hover:border-slate-400"}`}
-    >
-      {active && <Check className="mr-2 inline" size={15} />} {children}
-    </button>
-  );
-}
-function Toggle({
-  checked,
-  onChange,
-  icon: Icon,
-  children,
-}: {
-  checked: boolean;
-  onChange: (value: boolean) => void;
-  icon: typeof Stethoscope;
-  children: React.ReactNode;
-}) {
-  return (
-    <label
-      className={`flex cursor-pointer gap-3 rounded-2xl border p-4 text-sm leading-5 ${checked ? "border-slate-950 bg-slate-950 text-white" : "border-slate-200"}`}
-    >
-      <input
-        className="mt-1"
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <Icon className="mt-0.5 shrink-0" size={18} />
-      <span>{children}</span>
-    </label>
-  );
-}
-
-function FieldSignalBoard({
-  input,
-  setInput,
-  error,
-  signals,
-  onImport,
-  onClear,
-}: {
-  input: string;
-  setInput: (value: string) => void;
-  error: string;
-  signals: FieldSignal[];
-  onImport: () => void;
-  onClear: () => void;
-}) {
-  const summary = summarizeSignals(signals);
-  const brief = `PHOENIX 72H COMMUNITY SIGNAL BRIEF\nUNVERIFIED, PRIVACY-BOUNDED REPORTS\nSignals: ${summary.totalSignals}\nPeople represented: ${summary.totalPeople}\nRed / structural danger: ${summary.red}\nMedication <=1 day: ${summary.medication}\nUnsafe or uncertain water: ${summary.water}\nPregnancy or infant continuity: ${summary.maternalOrInfant}\nBroad areas: ${summary.areas.join(", ") || "None"}\n\nEach source card was checksum-validated, but the reported need itself is not independently verified. Do not treat this brief as dispatch, allocation, or facility-status data.`;
-  const download = () => {
-    const blob = new Blob(
-      [
-        JSON.stringify(
-          {
-            generatedAt: new Date().toISOString(),
-            disclaimer: "Checksum-valid cards; needs are unverified.",
-            signals,
-          },
-          null,
-          2,
-        ),
-      ],
-      { type: "application/json" },
-    );
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "phoenix-72h-community-signals.json";
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-  return (
-    <section className="mt-8 rounded-3xl border border-sky-300 bg-[#eaf7ff] p-5 md:p-7">
-      <div className="grid gap-5 lg:grid-cols-[1fr_.9fr]">
-        <div>
-          <Badge tone="dark">COMMUNITY SIGNAL MODE</Badge>
-          <h2 className="mt-3 text-3xl font-black">
-            Turn scattered messages into one safe, usable brief.
-          </h2>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-slate-700">
-            A volunteer, clinic worker, or shelter lead can paste PHX72 cards
-            received by QR, Bluetooth, or WhatsApp. PHOENIX validates the card
-            checksum locally, removes duplicates, and counts needs without
-            collecting identities or pretending reports are verified.
-          </p>
-          <label className="mt-5 block text-sm font-bold">
-            Paste a full PHX72 card
-            <textarea
-              data-testid="signal-input"
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="PHX72|A=La Guaira|..."
-              className="mt-2 min-h-28 w-full rounded-2xl border border-slate-300 bg-white p-3 font-mono text-xs"
-            />
-          </label>
-          {error && (
-            <p role="alert" className="mt-2 text-xs font-bold text-red-800">
-              {error}
-            </p>
-          )}
-          <button
-            data-testid="import-signal"
-            type="button"
-            onClick={onImport}
-            className="mt-3 rounded-xl bg-slate-950 px-4 py-3 text-xs font-black text-white"
-          >
-            IMPORT A COMMUNITY SIGNAL
-          </button>
-        </div>
-        <Card className="border-sky-200 bg-white/90">
-          <p className="text-xs font-black tracking-widest text-slate-500">
-            LOCAL NEEDS BRIEF
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <Metric label="CARDS" value={summary.totalSignals} />
-            <Metric label="PEOPLE" value={summary.totalPeople} />
-            <Metric label="RED" value={summary.red} />
-            <Metric label="MEDS ≤1D" value={summary.medication} />
-            <Metric label="WATER" value={summary.water} />
-            <Metric
-              label="MATERNAL / INFANT"
-              value={summary.maternalOrInfant}
-            />
-          </div>
-          <p className="mt-4 text-xs leading-5 text-slate-600">
-            Areas: {summary.areas.join(", ") || "No cards imported"}
-          </p>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <button
-              data-testid="copy-brief"
-              type="button"
-              onClick={() => void copyText(brief)}
-              className="rounded-xl border border-slate-300 px-3 py-3 text-xs font-black"
-            >
-              COPY BRIEF
-            </button>
-            <button
-              type="button"
-              onClick={download}
-              className="rounded-xl bg-[#f8c85c] px-3 py-3 text-xs font-black"
-            >
-              DOWNLOAD JSON
-            </button>
-          </div>
-          {signals.length > 0 && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="mt-3 text-xs font-black underline"
-            >
-              CLEAR LOCAL BRIEF
-            </button>
-          )}
-          <p className="mt-4 rounded-xl bg-amber-50 p-3 text-[11px] leading-5 text-amber-950">
-            <b>Important:</b> checksum validation proves the code was not
-            accidentally altered. It does not verify a person&apos;s reported
-            need, create a referral, or establish aid availability.
-          </p>
-        </Card>
-      </div>
-    </section>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-slate-100 p-3">
-      <p className="text-2xl font-black">{value}</p>
-      <p className="mt-1 text-[9px] font-black tracking-wider text-slate-500">
-        {label}
-      </p>
+          M{event.magnitude.toFixed(1)}
+        </span>
+      ))}
     </div>
+  );
+}
+
+function Guide({
+  icon: Icon,
+  title,
+  text,
+}: {
+  icon: typeof ShieldAlert;
+  title: string;
+  text: string;
+}) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5">
+      <Icon className="text-red-600" size={22} />
+      <h2 className="mt-3 font-black">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
+    </article>
   );
 }

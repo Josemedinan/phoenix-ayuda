@@ -1,44 +1,51 @@
 import { test, expect } from "@playwright/test";
 
-test("creates a private, offline handoff card for a disrupted treatment", async ({
+const liveFeed = {
+  source: "USGS Earthquake Hazards Program",
+  generated: 1_784_000_100_000,
+  events: [
+    {
+      id: "venezuela-test-1",
+      magnitude: 5.2,
+      place: "10 km north of La Guaira, Venezuela",
+      time: 1_784_000_000_000,
+      updated: 1_784_000_001_000,
+      status: "reviewed",
+      tsunami: false,
+      alert: "yellow",
+      longitude: -66.93,
+      latitude: 10.6,
+      depthKm: 12,
+      detailUrl: "https://example.test/detail",
+      eventUrl: "https://example.test/event",
+    },
+  ],
+};
+
+test("shows a Venezuela-focused live seismic event and safety action", async ({
   page,
-  context,
 }) => {
-  await page.goto("/");
-  await expect(
-    page.getByText("A health card that still works", { exact: false }),
-  ).toBeVisible();
-
-  await page.getByLabel("Medication days").selectOption("0");
-  await page
-    .getByText("Water source or storage is uncertain", { exact: true })
-    .click();
-  await expect(page.getByTestId("priority-title")).toHaveText("Do this today");
-  await expect(
-    page.getByText("Show this card at the next available health point today."),
-  ).toBeVisible();
-  await expect(page.getByTestId("handoff-code")).toContainText(
-    "PHX72|A=La Guaira|P=1|S=safe|M=0",
+  await page.route("**/api/earthquakes", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(liveFeed),
+    }),
   );
+  await page.goto("/");
 
-  const code = await page.getByTestId("handoff-code").innerText();
-  await page.getByTestId("signal-input").fill(code);
-  await page.getByTestId("import-signal").click();
-  await expect(page.getByText("Areas: La Guaira")).toBeVisible();
-
-  await page.getByTestId("copy-sms").click();
-  await expect(page.getByTestId("copy-sms")).toBeEnabled();
-
-  await page
-    .getByText("Someone is trapped or cannot leave", { exact: true })
-    .click();
-  await expect(page.getByTestId("priority-title")).toHaveText("Act now");
   await expect(
-    page.getByText("If you can: text your location landmark", { exact: false }),
+    page.getByText("Know the shaking.", { exact: false }),
   ).toBeVisible();
+  await expect(page.getByText("M 5.2", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("10 km north of La Guaira, Venezuela"),
+  ).toBeVisible();
+  await expect(page.getByTestId("epicenter-map")).toBeVisible();
+  await expect(page.getByTestId("event-row")).toContainText("depth 12.0 km");
+  await expect(page.getByTestId("event-row")).toContainText("HIGH ATTENTION");
 
-  await expect(page.getByText("READY", { exact: true })).toBeVisible();
-  await context.setOffline(true);
-  await page.reload({ waitUntil: "commit", timeout: 5_000 });
-  await expect(page.locator("main")).toBeVisible();
+  await page.getByLabel("Alert magnitude").fill("5.5");
+  await expect(page.getByText("Minimum magnitude: M 5.5")).toBeVisible();
+  await page.getByTestId("refresh-feed").click();
+  await expect(page.getByText("During shaking", { exact: true })).toBeVisible();
 });

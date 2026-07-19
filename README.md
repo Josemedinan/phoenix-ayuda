@@ -1,50 +1,31 @@
-# PHOENIX 72H
+# PHOENIX Seismo
 
-**A serverless community signal network for the first 72 hours after an earthquake.**
+**A Venezuela-focused earthquake monitor built for the moments after shaking begins.**
 
-PHOENIX 72H is a private, browser-based tool for a person or household whose phone may be their only remaining record after an earthquake. In about a minute it identifies structural danger, interrupted medication, maternal/infant care, and unsafe water; then produces a small, readable handoff card that can be copied into an SMS or carried as a QR code. A volunteer, clinic worker, or shelter lead can import multiple cards received through WhatsApp, QR, or device-to-device transfer and create an aggregate, exportable needs brief without collecting identities.
+PHOENIX Seismo turns the public, real-time USGS earthquake feed into a focused view for Venezuela and nearby waters: magnitude, time, depth, epicenter coordinates, event status, a schematic map, optional local distance, and short safety actions.
 
-Its health-system layer turns the 18 public, mapped health centres in the demo dataset into a **verification digital twin**. It does not pretend to know which sites are working. Instead, it ranks where scarce field assessment matters most from facility criticality, network isolation, proximity to the La Guaira response-focus area, missing status, and local community-signal pressure. A field worker can mark a site functional, constrained, or unsafe and export the assessment queue.
+It is not an earthquake prediction system, government warning authority, emergency dispatcher, or tsunami warning source. It makes the available seismic data clearer and more actionable without pretending it can replace official alerts.
 
-It is intentionally not an aid-allocation system, facility directory, or emergency dispatcher. It never claims a clinic is open or that rescuers are coming. The community brief marks all reported needs **unverified**: an intact checksum proves that a card was not accidentally changed, not that a reported need has been independently confirmed.
+## What works now
 
-## The problem it addresses
+- A live server-side proxy to the official USGS GeoJSON feed, refreshed every minute.
+- A Venezuela-centered monitoring window: 0–14°N and 74–57°W.
+- Recent event cards with magnitude, depth, epicenter, time in Venezuela, review status, and a direct USGS event link.
+- Optional on-device distance calculation. Location stays in the browser and is never sent to PHOENIX or USGS.
+- Native browser notifications for a user-selected magnitude threshold while the tab or installed app is open.
+- A schematic epicenter view and fixed, source-aligned safety actions for shaking, damaged structures, and coastal conditions.
 
-After the Venezuela earthquakes, reports highlighted not only traumatic injuries but also disrupted chronic treatment, maternal and infant care, and water-related illness. A household often needs to communicate these priorities with a dying battery, no mobile data, and no safe reason to disclose its precise location.
+## Alert boundary
 
-PHOENIX makes that handoff legible without a login, cloud record, or paid model call.
+Browser alerts require permission and work while PHOENIX is open or installed and active. A true background push-warning network would require formal authorization, a maintained push infrastructure, and direct integration with the responsible Venezuelan authorities. PHOENIX does not claim to provide that.
 
-## How it works
+## Data and safety
 
-```mermaid
-flowchart LR
-  A["60-second private check-in"] --> B["Deterministic 72H safety rules"]
-  B --> C["Prioritized actions"]
-  B --> D["Privacy-bounded PHX72 card"]
-  D --> E["QR / copied SMS / trusted neighbor"]
-  E --> F["Local community needs brief"]
-```
-
-- **Red:** someone is trapped or a building is unsafe.
-- **Amber:** treatment may run out, maternal/infant continuity is needed, or drinking water is uncertain.
-- **Green:** aftershock readiness and a protected continuity record.
-- **Offline handoff:** `PHX72` encodes only broad area, household count, safety, medication window, care flags, and water state. It contains no name, exact location, phone number, diagnosis, or account.
-- **Community signal mode:** imports intact cards locally, deduplicates them, counts red/medication/water/maternal needs, and exports a machine-readable JSON brief for a responder who chooses to use it.
-- **Facility verification twin:** ranks assessment visits instead of inventing operational status; stores local field observations and exports a transparent verification queue.
-- **Private persistence:** the card stays in the browser after a reload and can be erased with one button.
-
-The rules engines are deterministic and inspectable in [`domain/continuity/index.ts`](domain/continuity/index.ts) and [`domain/facility-priority/index.ts`](domain/facility-priority/index.ts). This is deliberate: in a high-stakes, low-connectivity moment, a user should not have to trust an opaque remote model to decide whether a person needs help or whether a facility has capacity.
-
-## Safety boundaries
-
-- PHOENIX is not medical advice, emergency dispatch, or a substitute for official instructions.
-- In immediate danger, ask a nearby person to contact available emergency services.
-- The water figure is the Sphere **planning reference** of 15 L/person/day, not a guarantee of supply or a clinical prescription.
-- Never rely on the app as proof that a health facility, shelter, responder, or supply is available.
+USGS documents that its real-time GeoJSON feeds update every minute and are intended for programmatic earthquake information displays. Events may be preliminary and later revised. PHOENIX shows the event status and keeps a direct source link visible. Follow official Venezuelan authorities in an emergency.
 
 ## Run locally
 
-Requires Node.js 20+ and npm. No API key, account, backend, or paid service is needed.
+Node.js 20+ and npm are required. There is no OpenAI API, paid API, user account, or secret.
 
 ```bash
 npm install
@@ -59,14 +40,23 @@ npm run build
 npm run test:e2e
 ```
 
-## Evidence
+## Architecture
 
-The product framing is based on post-earthquake health continuity, water safety, and structural safety guidance from [PAHO/WHO](https://www.paho.org/en/emergencies), [WHO household water guidance](https://www.who.int/publications/m/item/household-water-treatment-and-safe-storage-following-emergencies-and-disasters), [CDC earthquake safety guidance](https://www.cdc.gov/earthquakes/safety/stay-safe-after-an-earthquake.html), and the [Sphere Handbook](https://spherestandards.org/handbook/). The app limits itself to stable, source-aligned actions rather than presenting unverified live operational data.
+```mermaid
+flowchart LR
+  A["USGS public GeoJSON feed"] --> B["Next.js /api/earthquakes proxy"]
+  B --> C["Venezuela-focused monitor"]
+  C --> D["Browser alert threshold"]
+  C --> E["Epicenter / depth / distance"]
+  C --> F["Source-aligned safety steps"]
+```
+
+The proxy has no user query parameters and no API key. It fixes the geographic bounds, event type, magnitude floor, time window, and cache lifetime on the server.
 
 ## Codex and GPT-5.6 contribution
 
-PHOENIX 72H was meaningfully redesigned during OpenAI Build Week with Codex and GPT-5.6 as core development collaborators. They helped challenge the original dashboard approach, research the emergency context, design the privacy boundary and offline rules engine, implement the experience, and verify lint, type, unit, build, and browser/offline tests.
+Codex and GPT-5.6 were core development collaborators during OpenAI Build Week. They helped replace an unfocused humanitarian dashboard with a testable Venezuela seismic-monitoring product; research the primary USGS API; design the safety and alert boundaries; implement the route handler, monitor, tests, and PWA cache strategy; and run build/browser checks.
 
-The production path deliberately has **no OpenAI API dependency**. Codex and GPT-5.6 helped build and validate the product; an earthquake survivor should not need credits, an API key, or a working connection to use its core function.
+The production monitor deliberately has no OpenAI runtime dependency. Codex and GPT-5.6 helped create it; people seeking earthquake information should not need an API key or paid model call.
 
-See [`DEVPOST.md`](DEVPOST.md) for the submission story and demo script. The source is MIT-licensed; see [`LICENSE`](LICENSE).
+See [DEVPOST.md](DEVPOST.md) for the submission story and demo script. Source code is MIT-licensed.
