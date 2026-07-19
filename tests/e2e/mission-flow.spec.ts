@@ -1,41 +1,38 @@
 import { test, expect } from "@playwright/test";
 
-test("creates a private household plan and a low-bandwidth help card", async ({
+test("creates a private, offline handoff card for a disrupted treatment", async ({
   page,
   context,
 }) => {
   await page.goto("/");
-  await expect(page.locator("main")).toBeVisible();
+  await expect(
+    page.getByText("A health card that still works", { exact: false }),
+  ).toBeVisible();
 
-  await page.getByTestId("quick-water").click();
-  await expect(page.getByText("45 L", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("plan-action-water")).toContainText(
-    "Prioritize safe water",
+  await page.getByLabel("Medication days").selectOption("0");
+  await page
+    .getByText("Water source or storage is uncertain", { exact: true })
+    .click();
+  await expect(page.getByTestId("priority-title")).toHaveText("Do this today");
+  await expect(
+    page.getByText("Show this card at the next available health point today."),
+  ).toBeVisible();
+  await expect(page.getByTestId("handoff-code")).toContainText(
+    "PHX72|A=La Guaira|P=1|S=safe|M=0",
   );
 
-  await page.getByTestId("open-request").click();
-  await expect(page.getByTestId("request-code")).toContainText(
-    "PHX1|A=LG|P=1|D=3|N=WATER",
-  );
+  await page.getByTestId("copy-sms").click();
+  await expect(page.getByTestId("copy-sms")).toBeEnabled();
+
+  await page
+    .getByText("Someone is trapped or cannot leave", { exact: true })
+    .click();
+  await expect(page.getByTestId("priority-title")).toHaveText("Act now");
   await expect(
-    page.getByText("NO NAMES OR COORDINATES", { exact: true }),
+    page.getByText("If you can: text your location landmark", { exact: false }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "CREATE BILINGUAL RELAY" }).click();
-  await expect(page.getByTestId("relay-spanish")).toContainText("1 persona");
-  await expect(page.getByTestId("relay-spanish")).toContainText("agua segura");
-  await expect(page.getByTestId("relay-english")).toContainText("safe water");
-  await expect(page.getByText("VERIFIED PAYLOAD")).toBeVisible();
-
-  await page.getByTestId("nav-guia").click();
-  await expect(
-    page.getByText("DURING AN AFTERSHOCK", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("THIS GUIDE STAYS AVAILABLE OFFLINE", { exact: true }),
-  ).toBeVisible();
-
-  await expect(page.getByText("OFFLINE READY", { exact: true })).toBeVisible();
+  await expect(page.getByText("READY", { exact: true })).toBeVisible();
   await context.setOffline(true);
   await page.reload({ waitUntil: "commit", timeout: 5_000 });
   await expect(page.locator("main")).toBeVisible();

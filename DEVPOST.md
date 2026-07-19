@@ -1,88 +1,69 @@
-# Devpost submission kit
+# Devpost submission kit — PHOENIX 72H
 
-## Submission identity
-
-- **Project:** PHOENIX Aid
 - **Track:** Apps for Your Life
-- **Tagline:** An offline household lifeline for Venezuela that turns urgent needs into a verified plan and bilingual relay.
-- **Differentiation:** PHOENIX makes the critical path work without a connection, account, location trail, API key, or a model call.
+- **Tagline:** An offline continuity card that helps earthquake survivors protect treatment, water, and a safe handoff in the first 72 hours.
 
-## Ready-to-paste project story
+## Ready-to-paste story
 
 ### Inspiration
 
-Humanitarian products often begin with a map or an operations dashboard. We began with the person holding a low-battery phone after an earthquake: connectivity may disappear, exact location can be sensitive, a mapped hospital may not be open, and a long form is the last thing anyone needs. The useful question was: “What can this household safely do and communicate right now?”
+When an earthquake disrupts clinics, water, power, and communications, the most dangerous need is often invisible: a person whose medication is about to run out, a newborn who needs continuity of care, or a family with unsafe water. Generic dashboards cannot solve the moment when a neighbor has a low-battery phone and needs to explain what matters to the next health worker.
+
+We built PHOENIX 72H around that moment. It is not a coordination platform. It is an offline, private **continuity card** a person can physically hand to another person.
 
 ### What it does
 
-PHOENIX turns a handful of privacy-preserving choices into an ordered, source-attributed household plan that works offline. It calculates a transparent minimum-water reference, stores an offline safety guide, ranks mapped facilities by distance entirely in the browser, and creates a compact QR/SMS request with no name or coordinate.
+PHOENIX asks five short questions: structural safety, broad area, household size, medication window, care-continuity flags, and drinking-water state. Its deterministic safety kernel produces an immediate priority tier and a short sequence of safe, source-aligned next actions.
 
-Its signature feature is PHOENIX Relay: a Spanish and English message created directly from the exact plan fields. It has no free-form prompt, account, API key, or connection requirement. The same visible fields—broad area, household size, need codes, and structural risk—are used in the plan, compact code, and relay, so users can inspect the message before they share it.
+It then creates a `PHX72` QR/SMS handoff card. The card carries only what a helper needs to understand urgency: broad area, household size, structural state, medication time remaining, continuity flags, and water state. It never includes names, exact coordinates, phone numbers, diagnoses, accounts, or a claim that help has been dispatched.
+
+The app runs after its first load without connectivity. A trusted person can carry the QR, read the code, or copy the SMS at a health point. The browser-local card can be erased in one tap.
+
+### Why it is different
+
+Humanitarian technology often asks people to report into a system. PHOENIX makes the **human handoff** itself safer and more legible when there may be no system to report into.
+
+Its innovation is a small, auditable protocol for “continuity triage”: it compresses the information most likely to become dangerous over the next 72 hours into a privacy-bounded, device-to-device artifact. The same deterministic rules that choose the priority lane also define the payload, so the app cannot invent a facility, a diagnosis, availability, or a rescue promise.
 
 ### How we built it
 
-We used Next.js, React, TypeScript, Zod, a service worker, QR encoding, and reviewed OpenStreetMap-derived facility data. Critical guidance is a deterministic TypeScript rules engine with explicit source IDs. Geospatial ranking runs on-device.
+We used Next.js, React, TypeScript, a deterministic TypeScript rules engine, a service worker, local browser storage, QR encoding, and Playwright/Vitest tests. The service worker is versioned and uses a network-first strategy for application bundles, so a stale offline cache cannot leave the visible app with broken click handlers.
 
-Codex and GPT-5.6 were core development collaborators throughout Build Week. They helped reframe the product away from a non-actionable coordination dashboard, inspect the competition rules, research primary humanitarian sources, implement and refactor the app, build the pipeline, and verify it with unit, type, build, browser, mobile, and offline tests.
+Codex and GPT-5.6 were core collaborators during Build Week: they challenged the original dashboard concept, researched the humanitarian context, helped design and implement the new workflow, and helped run the safety and browser/offline validation loop.
 
-### Challenges
+The deployed experience uses **no OpenAI API, API key, server, account, or paid runtime**. That is a deliberate resilience decision, not a missing feature.
 
-The hardest design problem was avoiding a fragile dependency where the app needs a paid model or a live network at the exact moment a household needs help. We chose a progressive, offline-first architecture: deterministic source-attributed guidance, privacy-safe local calculation, and a bilingual relay built from an allowlist of visible facts.
+### Challenges and lessons
 
-Another challenge was being honest about humanitarian data. Facility points are useful for proximity but not proof of operational status. PHOENIX labels that uncertainty instead of implying live availability.
+The challenge was resisting attractive but unsafe features: live facility maps without verified operational data, unbounded AI chat in a medical/emergency scenario, and central data collection from people in crisis. We learned that a useful emergency product should make fewer promises, preserve more agency, and fail gracefully.
 
-### Accomplishments
+### What is next
 
-- The core experience remains useful after the network is switched off.
-- No account, name, exact coordinate, free-form prompt, or paid API is required.
-- Every critical plan action is traceable to a visible source.
-- The repository includes reviewed public data and automated tests.
-- The language relay is available without asking a remote system to invent or reinterpret emergency facts.
+We would validate the wording and workflow with Venezuelan health workers, disability advocates, caregivers, and people using low-end devices; add accessibility and locally translated packs; create signed, versioned guidance updates; and explore voluntary Bluetooth/Nearby Share transport without centralizing personal data.
 
-### What we learned
+## Three-minute demo script (2:40)
 
-In high-stakes consumer software, graceful degradation is a product feature. The essential path should be deterministic, inspectable, and usable with limited connectivity. AI was valuable in the development process for research synthesis, engineering iteration, and testing; the deployed emergency workflow must remain useful without it.
+**0:00–0:20 — Problem.** “After an earthquake, injury is not the only emergency. People lose medication, safe water, records, power, and the words to explain what matters. PHOENIX 72H is an offline continuity card—not a dashboard.”
 
-### What's next
+**0:20–0:55 — Check-in.** Select damaged building, choose La Guaira, choose one day of medication, and mark water uncertain. Show the priority instantly becoming **Act now** or **Do this today**. Explain that the logic is deterministic and visible.
 
-Next steps are field testing with Venezuelan families and accessibility experts; community-reviewed indigenous-language packs; signed, versioned offline source updates; local device-to-device relay over Bluetooth; and partnerships that can supply verified facility status without turning PHOENIX into a centralized tracker.
+**0:55–1:25 — Actionable output.** Show the ordered actions: do not re-enter, preserve medication information, seek care today, protect water. Point out the 15 L/person/day is labelled as a planning reference, not a supply promise.
 
-## Three-minute demo script (target: 2:45)
+**1:25–1:55 — Handoff.** Show the QR, compact `PHX72` code, and copied SMS. Explain exactly what it includes and excludes. “A neighbor can carry this to a health point; it does not pretend that a referral was sent.”
 
-**0:00–0:18 — Problem.** “After a disaster, maps and dashboards do not help if a household has no connection, cannot expose its location, or cannot explain its needs. PHOENIX is a household lifeline, not a coordination platform.”
+**1:55–2:15 — Privacy.** Reload the browser to show the card persists locally; press erase to show it disappears. Explain no account, GPS, name, diagnosis, or cloud database is involved.
 
-**0:18–0:48 — Immediate value.** On mobile, tap **I need water**. Show the ordered plan, the 45 L reference for one person over three days, source labels, and the limitation explaining that 15 L/person/day is contextual—not a maximum.
+**2:15–2:35 — Offline.** Switch the browser offline and reload after **READY** appears. Create or show the card again.
 
-**0:48–1:12 — Privacy and low bandwidth.** Open **Ask for help**. Show the QR and compact `PHX1` code. Point out that it carries a broad area and need categories, not a name or coordinate.
-
-**1:12–1:38 — Bilingual relay.** Open **Bilingual relay**. Show the Spanish, English, and read-aloud messages. Explain that all three are generated locally from the same verified plan fields, with no API key or network.
-
-**1:38–2:00 — Privacy-aware proximity.** Open **Near me** and explain that ranking happens inside the browser and every mapped facility is marked status unknown.
-
-**2:00–2:20 — Evidence and safety.** Open **Sources**. Show PAHO/WHO, CDC, WHO, Sphere, and OSM limitations.
-
-**2:20–2:45 — Codex + resilience.** Briefly show the repository tests and architecture. Switch the browser offline, reload, and show the plan, guide, request, and relay still working. Explain that Codex and GPT-5.6 were used to build and validate PHOENIX, while the deployed emergency path remains usable without paid services.
-
-The video must be public on YouTube, under three minutes, and its audio must explain Codex and GPT-5.6 collaboration under the [official rules](https://openai.devpost.com/rules).
+**2:35–2:40 — Codex.** “Codex and GPT-5.6 helped us replace a generic dashboard with this tested, offline-first product. The survivor-facing path needs no paid API.”
 
 ## Submission checklist
 
-- [ ] Create the Devpost submission under **Apps for Your Life**.
-- [ ] Add the English project description above.
-- [ ] Add the public, unrestricted demo URL: `[ADD DEMO URL]`.
-- [ ] Add this repository URL: `https://github.com/Josemedinan/phoenix-ayuda`.
-- [ ] Record a public YouTube demo shorter than 3:00: `[ADD VIDEO URL]`.
-- [ ] Explain how Codex and GPT-5.6 were core collaborators in the video's audio.
-- [ ] Run `/feedback` in the Codex session and add the Session ID: `[ADD CODEX SESSION ID]`.
-- [ ] Test the deployed URL in a private window without signing in.
-- [ ] Test offline reload after the service worker reports **OFFLINE READY**.
-- [ ] Submit before the deadline shown on the [official competition page](https://openai.devpost.com/).
-
-## Judging criteria map
-
-| Criterion                    | What to demonstrate                                                                                                                            |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Technological implementation | Offline PWA, deterministic safety kernel, local privacy boundary, QR/SMS protocol, reproducible data validation, automated tests               |
-| Design                       | Four-tap water journey, clear offline state, mobile-first cards, readable uncertainty and privacy boundaries, no account                       |
-| Potential impact             | Works under degraded connectivity, preserves privacy, crosses a language barrier, supports a household's next action without claiming dispatch |
-| Quality of idea              | A reliable household lifeline designed for the actual disaster context instead of a generic dashboard or chatbot                               |
+- [ ] Category: **Apps for Your Life**
+- [ ] Add the English story above.
+- [ ] Add a public demo URL.
+- [ ] Add `https://github.com/Josemedinan/phoenix-ayuda`.
+- [ ] Upload a public YouTube video under three minutes with spoken Codex/GPT-5.6 contribution.
+- [ ] Run `/feedback` and add the required Codex Session ID.
+- [ ] Test in a private window and offline after **READY** appears.
+- [ ] Submit before the deadline on the [official rules page](https://openai.devpost.com/rules).
